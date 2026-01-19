@@ -4,7 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>宇宙探査マインスイーパー</title>
-
 <style>
 :root{--cell-size:36px;}
 body{margin:0;font-family:sans-serif;background:url("space.jpg") center/cover no-repeat fixed;color:#fff;}
@@ -20,8 +19,8 @@ td:hover{background:#2a2a5a;} td.open{background:#33334d;cursor:default;}
 .num1{color:#66ccff;} .num2{color:#33ff77;} .num3{color:#ff6666;} .num4{color:#cc66ff;}
 .num5{color:#ffcc66;} .num6{color:#00cccc;} .num7{color:#aaaaaa;} .num8{color:#ffffff;}
 td.flag{background:#111144;color:#0f0;} td.enemy{background:black url("asteroid.jpeg") center/cover no-repeat;animation:pop .4s ease;}
-@keyframes pop{0%{transform:scale(1);}50%{transform:scale(1.2);}100%{transform:scale(1);}}
 td.alien{background:url("alien.jpeg") center/cover no-repeat;}
+@keyframes pop{0%{transform:scale(1);}50%{transform:scale(1.2);}100%{transform:scale(1);}}
 #side{background:rgba(5,5,20,.7);padding:12px;text-align:center;border-radius:8px;}
 @media(min-width:768px){#side{width:300px;}} @media(max-width:767px){#side{width:100%;}}
 #explorer{width:min(320px,90vw);transition:.4s;cursor:default;}
@@ -32,7 +31,6 @@ td.alien{background:url("alien.jpeg") center/cover no-repeat;}
 button{margin-top:8px;padding:8px 16px;font-size:16px;background:#1a1a3d;border:none;color:white;cursor:pointer;}
 #zoomOverlay{position:fixed;inset:0;background:rgba(0,0,0,.85);display:none;justify-content:center;align-items:center;z-index:9999;}
 #zoomOverlay img{max-width:90vw;max-height:90vh;border:8px solid gold;border-radius:16px;box-shadow:0 0 40px gold;}
-#boardMessage{position:absolute;inset:0;display:flex;justify-content:center;align-items:center;text-align:center;font-size:34px;font-weight:bold;color:gold;background:rgba(0,0,0,.45);text-shadow:0 0 10px black,0 0 18px gold;pointer-events:none;}
 #goldFlash{position:absolute;inset:0;background:gold;opacity:0;animation:flash .8s ease;}
 @keyframes flash{0%{opacity:0;}30%{opacity:.4;}100%{opacity:0;}}
 #flashOverlay{position:absolute;inset:0;background:white;opacity:0;pointer-events:none;z-index:999;}
@@ -40,7 +38,6 @@ button{margin-top:8px;padding:8px 16px;font-size:16px;background:#1a1a3d;border:
 @keyframes flashPulse{0%,100%{opacity:0;}50%{opacity:0.1;}}
 </style>
 </head>
-
 <body>
 <div id="container">
   <div id="game"></div>
@@ -51,7 +48,6 @@ button{margin-top:8px;padding:8px 16px;font-size:16px;background:#1a1a3d;border:
     <button id="bgmToggle">BGM OFF</button>
   </div>
 </div>
-
 <div id="zoomOverlay"><img id="zoomImage"></div>
 <div id="flashOverlay"></div>
 
@@ -67,7 +63,7 @@ button{margin-top:8px;padding:8px 16px;font-size:16px;background:#1a1a3d;border:
 const ROWS=9,COLS=9,ENEMIES=10;
 let board=[],opened=[],flags=[],gameOver=false;
 let usedFlag=false,lastMode=false;
-let alienPos=null;
+let alienPlaced=false, alienPos=null;
 
 const game=document.getElementById("game");
 const explorer=document.getElementById("explorer");
@@ -112,7 +108,7 @@ function init(){
   opened=Array.from({length:ROWS},()=>Array(COLS).fill(false));
   flags=Array.from({length:ROWS},()=>Array(COLS).fill(false));
   gameOver=false; usedFlag=false; lastMode=false;
-  alienPos=null;
+  alienPlaced=false; alienPos=null;
 
   stopAllBGM();
   playBGM();
@@ -124,7 +120,7 @@ function init(){
   status.className="";
   flashOverlay.classList.remove("flashAnim");
 
-  const old=document.getElementById("boardMessage");
+  let old=document.getElementById("boardMessage");
   if(old) old.remove();
 
   // 爆弾配置
@@ -136,21 +132,13 @@ function init(){
 
   // 数字配置
   for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++){
-    if(board[r][c]==="E")continue;
+    if(board[r][c]==="E") continue;
     let n=0;
     for(let dr=-1;dr<=1;dr++)for(let dc=-1;dc<=1;dc++){
       let nr=r+dr,nc=c+dc;
-      if(nr>=0&&nr<ROWS&&nc>=0&&nc<COLS&&board[nr][nc]==="E")n++;
+      if(nr>=0&&nr<ROWS&&nc>=0&&nc<COLS && board[nr][nc]==="E") n++;
     }
     board[r][c]=n;
-  }
-
-  // 宇宙人配置（0マスの中からランダム1箇所）
-  const zeros=[];
-  for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++)if(board[r][c]===0) zeros.push([r,c]);
-  if(zeros.length>0){
-    alienPos = zeros[Math.floor(Math.random()*zeros.length)];
-    board[alienPos[0]][alienPos[1]] = 'A';
   }
 
   draw();
@@ -168,8 +156,8 @@ function draw(){
       if(opened[r][c]){
         td.classList.add("open");
         if(board[r][c]==="E") td.classList.add("enemy");
-        else if(board[r][c]==='A') td.classList.add("alien");
-        else if(board[r][c]>0){
+        else if(board[r][c]==="A") td.classList.add("alien");
+        else if(board[r][c]>0) {
           td.textContent=board[r][c];
           td.classList.add("num"+board[r][c]);
         }
@@ -178,8 +166,7 @@ function draw(){
         td.textContent="🚩";
       }
 
-      let pressTimer=null;
-      let longPress=false;
+      let pressTimer=null, longPress=false;
 
       td.addEventListener("touchstart", e=>{
         if(gameOver||opened[r][c]) return;
@@ -193,7 +180,6 @@ function draw(){
           checkLast2();
         },500);
       });
-
       td.addEventListener("touchend", ()=>clearTimeout(pressTimer));
       td.addEventListener("touchmove", ()=>clearTimeout(pressTimer));
 
@@ -204,7 +190,6 @@ function draw(){
           draw();
         }
       };
-
       td.oncontextmenu=e=>{
         e.preventDefault();
         if(!opened[r][c]&&!gameOver){
@@ -223,8 +208,9 @@ function draw(){
   game.appendChild(table);
 }
 
+// セルを開く（0マス自動展開、宇宙人1体を0マス内に配置）
 function openCell(r,c){
-  if(opened[r][c])return;
+  if(opened[r][c]) return;
 
   if(board[r][c]==="E"){
     opened[r][c]=true;
@@ -234,8 +220,7 @@ function openCell(r,c){
     explorer.src="explorer_captured.jpeg";
     explorer.classList.add("captured");
     status.textContent="ドカーン！";
-    for(let i=0;i<ROWS;i++)for(let j=0;j<COLS;j++)
-      if(board[i][j]==="E") opened[i][j]=true;
+    for(let i=0;i<ROWS;i++)for(let j=0;j<COLS;j++) if(board[i][j]==="E") opened[i][j]=true;
     draw();
     return;
   }
@@ -243,21 +228,35 @@ function openCell(r,c){
   opened[r][c]=true;
   if(board[r][c]!=='A') play(seOpen);
 
-  if(board[r][c]===0 || board[r][c]==='A')
-    for(let dr=-1;dr<=1;dr++)for(let dc=-1;dc<=1;dc++){
-      let nr=r+dr,nc=c+dc;
-      if(nr>=0&&nr<ROWS&&nc>=0&&nc<COLS) openCell(nr,nc);
+  // ランダムで0マス内に宇宙人1体配置
+  if(!alienPlaced){
+    const zeros=[];
+    for(let i=0;i<ROWS;i++)for(let j=0;j<COLS;j++)
+      if(!opened[i][j] && board[i][j]===0) zeros.push([i,j]);
+    if(zeros.length>0){
+      const [ar,ac]=zeros[Math.floor(Math.random()*zeros.length)];
+      board[ar][ac]='A';
+      alienPlaced=true;
     }
+  }
+
+  if(board[r][c]===0 || board[r][c]==='A'){
+    for(let dr=-1;dr<=1;dr++)for(let dc=-1;dc<=1;dc++){
+      const nr=r+dr, nc=c+dc;
+      if(nr>=0 && nr<ROWS && nc>=0 && nc<COLS) openCell(nr,nc);
+    }
+  }
 
   checkLast2();
   checkClear();
 }
 
+// ラスト2マス演出
 function checkLast2(){
   let safe=ROWS*COLS-ENEMIES, count=0, unopenedBomb=0;
   for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++){
-    if(opened[r][c]&&board[r][c]!=="E") count++;
-    if(!opened[r][c]&&board[r][c]==="E"&&!flags[r][c]) unopenedBomb++;
+    if(opened[r][c] && board[r][c]!=="E") count++;
+    if(!opened[r][c] && board[r][c]==="E" && !flags[r][c]) unopenedBomb++;
   }
   let remaining = safe - count + unopenedBomb;
   if(remaining<=2 && !lastMode){
@@ -272,10 +271,10 @@ function checkLast2(){
   }
 }
 
+// クリア判定
 function checkClear(){
   let safe=ROWS*COLS-ENEMIES, count=0;
-  for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++)
-    if(opened[r][c]&&board[r][c]!=="E") count++;
+  for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++) if(opened[r][c] && board[r][c]!=="E") count++;
 
   if(count===safe){
     gameOver=true;
@@ -283,11 +282,11 @@ function checkClear(){
     flashOverlay.classList.remove("flashAnim");
     status.classList.add("clear");
 
-    const playClearSounds = () => {
-      const seClear1 = new Audio('clear1.mp3');
-      const seClear2 = new Audio('clear2.mp3');
+    const playClearSounds=()=>{
+      const seClear1=new Audio('clear1.mp3');
+      const seClear2=new Audio('clear2.mp3');
       seClear1.play();
-      seClear1.onended = ()=>seClear2.play();
+      seClear1.onended=()=>seClear2.play();
     };
 
     if(!usedFlag){
