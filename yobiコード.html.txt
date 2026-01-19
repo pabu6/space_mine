@@ -1,3 +1,4 @@
+```html
 <!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -6,6 +7,9 @@
 <title>宇宙探査マインスイーパー</title>
 
 <style>
+/* ======================
+   PC（触らない）
+====================== */
 :root{--cell-size:36px;}
 html,body{height:100%; overflow:hidden;}
 body{
@@ -20,9 +24,7 @@ body{
   touch-action:manipulation;
 }
 
-/* ======================
-   レイアウト
-====================== */
+/* レイアウト */
 #container{ display:flex; height:100vh; }
 
 @media(min-width:768px){
@@ -30,18 +32,64 @@ body{
   :root{--cell-size:48px;}
 }
 
+/* ======================
+   スマホだけ最適化（PCは一切変更しない）
+====================== */
 @media(max-width:767px){
-  :root{--cell-size:min(9vw,38px);}
+  :root{
+    --topbar-h:48px;
+    --gap:8px;
+    --side-pad:8px;
+    --cell-size:min(9.8vw, 38px);
+  }
+
+  html,body{ height:100%; overflow:hidden; }
+
   #container{
     flex-direction:column;
     align-items:center;
-    padding-top:56px;
-    gap:10px;
+    height:100vh;
+    padding-top:calc(var(--topbar-h) + env(safe-area-inset-top, 0px));
+    padding-bottom:env(safe-area-inset-bottom, 0px);
+    gap:var(--gap);
     box-sizing:border-box;
   }
-  #side{ order:1; width:92vw; padding:10px; }
-  #game{ order:2; width:92vw; padding:8px; }
-  #explorer{ width:58vw; max-width:300px; }
+
+  #side{
+    order:1;
+    width:94vw;
+    padding:var(--side-pad);
+  }
+
+  #explorer{
+    width:100%;
+    max-width:94vw;
+    height:32vh;
+    max-height:320px;
+    object-fit:contain;
+    display:block;
+    margin:0 auto;
+  }
+
+  #status{
+    margin-top:6px;
+    font-size:15px;
+    line-height:1.2;
+  }
+
+  #game{
+    order:2;
+    width:94vw;
+    padding:6px;
+    max-height:calc(
+      100vh
+      - (var(--topbar-h) + env(safe-area-inset-top, 0px))
+      - env(safe-area-inset-bottom, 0px)
+      - 32vh
+      - 82px
+    );
+    overflow:hidden;
+  }
 }
 
 /* ======================
@@ -50,8 +98,11 @@ body{
 #topButtons{display:none;}
 @media(max-width:767px){
   #topButtons{
-    position:fixed; top:0; left:0;
-    width:100%; height:48px;
+    position:fixed;
+    top:env(safe-area-inset-top, 0px);
+    left:0;
+    width:100%;
+    height:48px;
     background:rgba(5,5,20,.9);
     display:flex;
     justify-content:center;
@@ -144,7 +195,6 @@ td{
   user-select:none;
   -webkit-user-select:none;
   -webkit-touch-callout:none;
-
   touch-action:manipulation;
 }
 td.open{background:#33334d;cursor:default;}
@@ -217,7 +267,7 @@ button{
   <button id="bgmToggleTop">BGM OFF</button>
 </div>
 
-<div id="hype"><div class="box">ラスト1マス！！！</div></div>
+<div id="hype"><div class="box" id="hypeText"></div></div>
 
 <div id="container">
   <div id="game"></div>
@@ -235,7 +285,7 @@ button{
 
 <!-- AUDIO -->
 <audio id="seOpen" src="open.mp3"></audio>
-<audio id="seFlag" src="flag.mp3"></audio>
+<audio id="seFlag" src="flag.mp3"></audio> <!-- ★旗の効果音（これを鳴らす） -->
 <audio id="seDeath" src="death.mp3"></audio>
 <audio id="sePerfect" src="perfect.mp3"></audio>
 <audio id="alienSound" src="alienSound.mp3"></audio>
@@ -245,29 +295,16 @@ button{
 <audio id="lastBgm" src="last.mp3" loop></audio>
 
 <script>
-/* =========================
-   画像ファイル名（この通りに保存してください）
-   - 通常: explorer.jpeg
-   - 煽り1: hype1.jpeg  (残り10以下)
-   - 煽り2: hype2.jpeg  (残り3以下)
-   - 煽り3: hype3.jpeg  (残り1)
-   - クリア: clear.jpeg
-   - パーフェクト: perfect.jpeg
-========================= */
-
 const ROWS=9, COLS=9, ENEMIES=10;
 
-/* 表示画像（HTMLと同じフォルダに置く想定） */
 const IMG_NORMAL   = "explorer.jpeg";
 const IMG_HYPE1    = "hype1.jpeg";
 const IMG_HYPE2    = "hype2.jpeg";
 const IMG_HYPE3    = "hype3.jpeg";
 const IMG_CLEAR    = "clear.jpeg";
 const IMG_PERFECT  = "perfect.jpeg";
-const IMG_DEATH    = "explorer.jpeg"; // 死亡時も通常画像のまま（別にするならここを変更）
+const IMG_DEATH    = "explorer.jpeg";
 
-const ZERO_LIMIT_TRIES = 1500;
-const MAX_ZERO_CELLS = 8;
 const EXTRA_RING_OPEN = 3;
 
 let board=[], opened=[], flags=[];
@@ -275,19 +312,17 @@ let gameOver=false;
 let usedFlag=false;
 let started=false;
 
-let lastMode=false;   // BGM切替用（残り<=10）
-let stageShown=0;     // 0/1/2/3
+let lastMode=false;
+let stageShown=0;
 
 let alienPos=null;
 let alienFound=false;
-
-let halfShown=false;
-let lastTenShown=false;
 
 const game=document.getElementById("game");
 const explorer=document.getElementById("explorer");
 const statusEl=document.getElementById("status");
 const hype=document.getElementById("hype");
+const hypeText=document.getElementById("hypeText");
 
 const bgm=document.getElementById("bgm");
 const lastBgm=document.getElementById("lastBgm");
@@ -296,59 +331,69 @@ const bgmToggle=document.getElementById("bgmToggle");
 const bgmToggleTop=document.getElementById("bgmToggleTop");
 
 const seOpen=document.getElementById("seOpen");
-const seFlag=document.getElementById("seFlag");
+const seFlag=document.getElementById("seFlag"); // ★追加：旗SE参照
 const seDeath=document.getElementById("seDeath");
 const sePerfect=document.getElementById("sePerfect");
 const alienSound=document.getElementById("alienSound");
 const clear1=document.getElementById("clear1");
 const clear2=document.getElementById("clear2");
 
-/* ===== サウンド ===== */
+/* ===== BGM：スマホで一度タップしたら死んでもRESTARTでも継続 ===== */
+let bgmUnlocked=false;
+let userBgmEnabled=true;
+
 function play(se){
   if(!se) return;
   try{ se.currentTime=0; se.play().catch(()=>{}); }catch(e){}
 }
-function stopAllBgm(){ bgm.pause(); lastBgm.pause(); }
-function setBgmButtonText(on){
+function setBgmButtonText(){
+  const on = bgmUnlocked && userBgmEnabled;
   const t = on ? "BGM OFF" : "BGM ON";
   bgmToggle.textContent=t;
   bgmToggleTop.textContent=t;
 }
-function isAnyBgmPlaying(){ return (!bgm.paused) || (!lastBgm.paused); }
-function startBgmIfPossible(){
-  const target = lastMode ? lastBgm : bgm;
-  target.play().then(()=>setBgmButtonText(true)).catch(()=>setBgmButtonText(false));
+function currentBgmEl(){ return lastMode ? lastBgm : bgm; }
+function ensureBgmPlaying(){
+  if(!bgmUnlocked || !userBgmEnabled) return;
+  const target=currentBgmEl();
+  if(!target.paused) return;
+  if(target===bgm && !lastBgm.paused) lastBgm.pause();
+  if(target===lastBgm && !bgm.paused) bgm.pause();
+  target.play().catch(()=>{});
 }
 function toggleBGM(){
-  if(isAnyBgmPlaying()){
-    stopAllBgm(); setBgmButtonText(false);
-  }else{
-    const target = lastMode ? lastBgm : bgm;
-    target.play().then(()=>setBgmButtonText(true)).catch(()=>setBgmButtonText(false));
-  }
+  userBgmEnabled=!userBgmEnabled;
+  if(!userBgmEnabled){ bgm.pause(); lastBgm.pause(); }
+  else ensureBgmPlaying();
+  setBgmButtonText();
 }
 bgmToggle.onclick=toggleBGM;
 bgmToggleTop.onclick=toggleBGM;
 
-/* スマホ自動再生制限対策 */
 document.addEventListener("pointerdown", ()=>{
-  if(!isAnyBgmPlaying()) startBgmIfPossible();
+  bgmUnlocked=true;
+  ensureBgmPlaying();
+  setBgmButtonText();
 },{once:true});
 
-/* 右クリック/長押しメニュー抑止 */
-document.addEventListener("contextmenu", (e)=>e.preventDefault());
+function switchBgmMode(toLast){
+  if(lastMode===toLast) return;
+  lastMode=toLast;
+  ensureBgmPlaying();
+}
 
+/* クリア後に時計音だけ残る対策 */
+function stopHypeBgmOnClear(){
+  if(!lastBgm.paused) lastBgm.pause();
+  lastMode=false;
+  ensureBgmPlaying();
+}
+
+document.addEventListener("contextmenu", (e)=>e.preventDefault());
 document.getElementById("restart").onclick=init;
 document.getElementById("restartTop").onclick=init;
 
 /* ===== util ===== */
-function shuffle(arr){
-  for(let i=arr.length-1;i>0;i--){
-    const j=Math.floor(Math.random()*(i+1));
-    [arr[i],arr[j]]=[arr[j],arr[i]];
-  }
-  return arr;
-}
 function inBounds(r,c){ return r>=0 && r<ROWS && c>=0 && c<COLS; }
 function neighbors(r,c){
   const res=[];
@@ -372,10 +417,18 @@ function computeNumbers(){
     }
   }
 }
-function countZeroCells(){
-  let z=0;
-  for(let r=0;r<ROWS;r++) for(let c=0;c<COLS;c++) if(board[r][c]===0) z++;
-  return z;
+function remainingSafeCells(){
+  let cnt=0;
+  for(let r=0;r<ROWS;r++){
+    for(let c=0;c<COLS;c++){
+      if(board[r][c]!==-1 && !opened[r][c]) cnt++;
+    }
+  }
+  return cnt;
+}
+function key(r,c){ return r+","+c; }
+function isAlienCell(r,c){
+  return alienPos && alienPos[0]===r && alienPos[1]===c;
 }
 
 /* ===== board ===== */
@@ -383,425 +436,296 @@ function placeEnemiesWithSafeZone(excludeR, excludeC){
   board = Array.from({length:ROWS},()=>Array(COLS).fill(0));
 
   const safe=new Set();
-  safe.add(excludeR+","+excludeC);
-  for(const [nr,nc] of neighbors(excludeR, excludeC)) safe.add(nr+","+nc);
+  safe.add(key(excludeR,excludeC));
+  for(const [nr,nc] of neighbors(excludeR, excludeC)) safe.add(key(nr,nc));
 
   let placed=0;
   while(placed<ENEMIES){
     const r=Math.floor(Math.random()*ROWS);
     const c=Math.floor(Math.random()*COLS);
+    if(safe.has(key(r,c))) continue;
     if(board[r][c]===-1) continue;
-    if(safe.has(r+","+c)) continue;
     board[r][c]=-1;
     placed++;
   }
-  computeNumbers();
-}
-function generateBoard(excludeR, excludeC){
-  let best=null, bestZero=999;
-  for(let t=0; t<ZERO_LIMIT_TRIES; t++){
-    placeEnemiesWithSafeZone(excludeR, excludeC);
-    const z=countZeroCells();
-    if(z<bestZero){
-      bestZero=z;
-      best=board.map(row=>row.slice());
-      if(z<=MAX_ZERO_CELLS) break;
-    }
-  }
-  board = best || board;
-}
-
-/* alien every game */
-function placeAlien(excludeR, excludeC){
-  const avoid=new Set();
-  avoid.add(excludeR+","+excludeC);
-  for(const [nr,nc] of neighbors(excludeR, excludeC)) avoid.add(nr+","+nc);
-
-  const candidates=[];
-  for(let r=0;r<ROWS;r++){
-    for(let c=0;c<COLS;c++){
-      if(board[r][c]===-1) continue;
-      if(avoid.has(r+","+c)) continue;
-      candidates.push({r,c});
-    }
-  }
-  if(candidates.length===0){
-    for(let r=0;r<ROWS;r++) for(let c=0;c<COLS;c++) if(board[r][c]!==-1) candidates.push({r,c});
-  }
-  alienPos = candidates[Math.floor(Math.random()*candidates.length)] || null;
-  alienFound=false;
-}
-
-/* ===== state ===== */
-function setExplorerImageByStage(stage){
-  // gameOver中は別処理（死亡/クリア）なのでここは通常プレイ時専用
-  if(stage===0) explorer.src = IMG_NORMAL;
-  if(stage===1) explorer.src = IMG_HYPE1;
-  if(stage===2) explorer.src = IMG_HYPE2;
-  if(stage===3) explorer.src = IMG_HYPE3;
-}
-
-function buildEmptyState(){
-  board = Array.from({length:ROWS},()=>Array(COLS).fill(0));
-  opened = Array.from({length:ROWS},()=>Array(COLS).fill(false));
-  flags  = Array.from({length:ROWS},()=>Array(COLS).fill(false));
-
-  gameOver=false;
-  usedFlag=false;
-  started=false;
-
-  lastMode=false;
-  stageShown=0;
 
   alienPos=null;
   alienFound=false;
+  while(true){
+    const r=Math.floor(Math.random()*ROWS);
+    const c=Math.floor(Math.random()*COLS);
+    if(safe.has(key(r,c))) continue;
+    if(board[r][c]===-1) continue;
+    alienPos=[r,c];
+    break;
+  }
 
-  halfShown=false;
-  lastTenShown=false;
-
-  explorer.src = IMG_NORMAL;
-  explorer.classList.remove("captured","perfect");
-
-  statusEl.classList.remove("clear");
-  statusEl.textContent="探索開始！";
-
-  game.classList.remove("stage1","stage2","stage3");
-  hype.classList.remove("show");
-
-  stopAllBgm();
-  startBgmIfPossible();
-}
-
-function init(){
-  buildEmptyState();
-  render();
+  computeNumbers();
 }
 
 /* ===== render ===== */
+function cellEl(r,c){
+  return document.querySelector(`td[data-r="${r}"][data-c="${c}"]`);
+}
 function render(){
   const table=document.createElement("table");
-
   for(let r=0;r<ROWS;r++){
     const tr=document.createElement("tr");
     for(let c=0;c<COLS;c++){
       const td=document.createElement("td");
-      const isOpen=opened[r][c];
-      const isFlag=flags[r][c];
+      td.dataset.r=r; td.dataset.c=c;
 
-      if(isOpen) td.classList.add("open");
-      if(isFlag) td.classList.add("flag");
+      td.addEventListener("click",(e)=>{
+        e.preventDefault();
+        if(gameOver) return;
+        openCell(r,c);
+      });
 
-      if(isOpen && alienPos && alienPos.r===r && alienPos.c===c && alienFound){
-        td.classList.add("alien");
-        td.textContent="";
-      }else if(isOpen){
-        const v=board[r][c];
-        if(v===-1){
-          td.classList.add("enemy");
-          td.textContent="";
-        }else if(v===0){
-          td.textContent="";
-        }else{
-          td.textContent=String(v);
-          td.classList.add("num"+v);
-        }
-      }else{
-        td.textContent = isFlag ? "🚩" : "";
-      }
+      td.addEventListener("contextmenu",(e)=>{
+        e.preventDefault();
+        if(gameOver) return;
+        toggleFlag(r,c);
+      });
 
-      td.addEventListener("click", ()=> onOpen(r,c));
-      td.addEventListener("contextmenu", (e)=>{ e.preventDefault(); onToggleFlag(r,c); });
-      attachLongPress(td, ()=> onToggleFlag(r,c));
+      // スマホ長押し旗
+      let pressTimer=null;
+      td.addEventListener("pointerdown",(e)=>{
+        if(e.pointerType==="mouse") return;
+        if(gameOver) return;
+        pressTimer=setTimeout(()=>{
+          toggleFlag(r,c);
+          pressTimer=null;
+        },380);
+      });
+      td.addEventListener("pointerup",()=>{ if(pressTimer){clearTimeout(pressTimer);pressTimer=null;} });
+      td.addEventListener("pointerleave",()=>{ if(pressTimer){clearTimeout(pressTimer);pressTimer=null;} });
+      td.addEventListener("pointercancel",()=>{ if(pressTimer){clearTimeout(pressTimer);pressTimer=null;} });
 
       tr.appendChild(td);
     }
     table.appendChild(tr);
   }
-
   game.innerHTML="";
   game.appendChild(table);
-
-  updateProgressMessages();
-  updateEndgameEffects(); // ここで段階に応じて画像も切り替える
 }
 
-/* ===== long press ===== */
-function attachLongPress(el, fn){
-  let timer=null;
-  let moved=false;
+function updateCellView(r,c){
+  const td=cellEl(r,c);
+  if(!td) return;
 
-  const start=()=>{
-    if(gameOver) return;
-    moved=false;
-    timer=setTimeout(()=>{ timer=null; fn(); }, 450);
-  };
-  const cancel=()=>{ if(timer){ clearTimeout(timer); timer=null; } };
+  td.className="";
+  td.textContent="";
 
-  el.addEventListener("touchstart", start, {passive:true});
-  el.addEventListener("touchmove", ()=>{ moved=true; cancel(); }, {passive:true});
-  el.addEventListener("touchend", ()=>{ if(!moved) cancel(); }, {passive:true});
-  el.addEventListener("touchcancel", cancel, {passive:true});
-}
-
-/* ===== gameplay ===== */
-function ensureStarted(firstR, firstC){
-  if(started) return;
-  started=true;
-  generateBoard(firstR, firstC);
-  placeAlien(firstR, firstC);
-}
-
-function openZeroAreaFullWithRing(sr, sc){
-  const zeroSet=new Set();
-  const ringSet=new Set();
-  const q=[[sr,sc]];
-  zeroSet.add(sr+","+sc);
-
-  while(q.length){
-    const [r,c]=q.shift();
-    for(const [nr,nc] of neighbors(r,c)){
-      if(board[nr][nc]===0){
-        const key=nr+","+nc;
-        if(!zeroSet.has(key)){
-          zeroSet.add(key);
-          q.push([nr,nc]);
-        }
-      }else if(board[nr][nc]>0){
-        ringSet.add(nr+","+nc);
-      }
-    }
+  if(flags[r][c] && !opened[r][c]){
+    td.classList.add("flag");
+    td.textContent="🚩";
+    return;
   }
+  if(!opened[r][c]) return;
 
-  for(const key of zeroSet){
-    const [r,c]=key.split(",").map(Number);
-    if(!flags[r][c]) opened[r][c]=true;
-  }
-  for(const key of ringSet){
-    const [r,c]=key.split(",").map(Number);
-    if(!flags[r][c]) opened[r][c]=true;
-  }
-
-  // 追加で少しだけ開く（リング外側の数字のみ）
-  const extraCandidates=new Set();
-  for(const key of ringSet){
-    const [r,c]=key.split(",").map(Number);
-    for(const [nr,nc] of neighbors(r,c)){
-      const k=nr+","+nc;
-      if(!inBounds(nr,nc)) continue;
-      if(zeroSet.has(k) || ringSet.has(k)) continue;
-      if(opened[nr][nc] || flags[nr][nc]) continue;
-      if(board[nr][nc] > 0) extraCandidates.add(k);
-    }
-  }
-  const list=[...extraCandidates].map(s=>s.split(",").map(Number));
-  shuffle(list);
-  for(let i=0;i<Math.min(EXTRA_RING_OPEN, list.length); i++){
-    const [r,c]=list[i];
-    opened[r][c]=true;
-  }
-}
-
-function onOpen(r,c){
-  if(gameOver) return;
-  if(flags[r][c]) return;
-
-  ensureStarted(r,c);
-  if(opened[r][c]) return;
-
-  const isAlienCell = alienPos && alienPos.r===r && alienPos.c===c;
-
-  if(board[r][c]===-1){
-    opened[r][c]=true;
-    revealAllEnemies();
-    gameOver=true;
-
-    explorer.src = IMG_DEATH;
-    explorer.classList.add("captured");
-    statusEl.textContent="ドカーンッ！ 任務失敗！！";
-    play(seDeath);
-
-    stopAllBgm();
-    setBgmButtonText(false);
-
-    render();
+  if(isAlienCell(r,c)){
+    td.classList.add("open","alien");
     return;
   }
 
-  opened[r][c]=true;
+  td.classList.add("open");
+  const v=board[r][c];
+  if(v===-1){ td.classList.add("enemy"); return; }
+  if(v===0) return;
 
-  if(isAlienCell && !alienFound){
-    alienFound=true;
-    play(alienSound);
-    statusEl.textContent="あっ！！火星人だ！！";
-  }
-
-  if(board[r][c]===0){
-    openZeroAreaFullWithRing(r,c);
-
-    // 宇宙人は自分で開けたい：自動展開で勝手に開いたら閉じ戻す
-    if(alienPos && !alienFound && opened[alienPos.r][alienPos.c]){
-      opened[alienPos.r][alienPos.c]=false;
-    }
-  }
-
-  play(seOpen);
-  render();
-  checkClear();
+  td.textContent=String(v);
+  td.classList.add("num"+v);
+}
+function refreshAll(){
+  for(let r=0;r<ROWS;r++) for(let c=0;c<COLS;c++) updateCellView(r,c);
 }
 
-function onToggleFlag(r,c){
+/* ===== logic ===== */
+function floodOpen(sr,sc){
+  const q=[[sr,sc]];
+  const seen=new Set([key(sr,sc)]);
+
+  while(q.length){
+    const [r,c]=q.shift();
+    opened[r][c]=true;
+    flags[r][c]=false;
+    updateCellView(r,c);
+
+    if(isAlienCell(r,c)) continue;
+    if(board[r][c]!==0) continue;
+
+    for(const [nr,nc] of neighbors(r,c)){
+      const k=key(nr,nc);
+      if(seen.has(k)) continue;
+      if(opened[nr][nc]) continue;
+      if(flags[nr][nc]) continue;
+      if(isAlienCell(nr,nc)) continue;
+      seen.add(k);
+      q.push([nr,nc]);
+    }
+  }
+}
+
+function openExtraRing(r,c,dist){
+  for(let dr=-dist; dr<=dist; dr++){
+    for(let dc=-dist; dc<=dist; dc++){
+      const nr=r+dr, nc=c+dc;
+      if(!inBounds(nr,nc)) continue;
+      if(opened[nr][nc]) continue;
+      opened[nr][nc]=true;
+      updateCellView(nr,nc);
+    }
+  }
+}
+
+function openCell(r,c){
+  if(gameOver) return;
+  if(flags[r][c]) return;
+
+  if(!started){
+    started=true;
+    placeEnemiesWithSafeZone(r,c);
+  }
+  if(opened[r][c]) return;
+
+  play(seOpen);
+
+  if(isAlienCell(r,c)){
+    opened[r][c]=true;
+    alienFound=true;
+    updateCellView(r,c);
+    play(alienSound);
+    statusEl.textContent="宇宙人だ！！！";
+    checkStagesAndClear();
+    return;
+  }
+
+  if(board[r][c]===-1){
+    gameOver=true;
+    explorer.src=IMG_DEATH;
+    explorer.classList.add("captured");
+    statusEl.textContent="撃沈…！";
+    play(seDeath);
+
+    for(let rr=0; rr<ROWS; rr++){
+      for(let cc=0; cc<COLS; cc++){
+        if(board[rr][cc]===-1) opened[rr][cc]=true;
+      }
+    }
+    openExtraRing(r,c,EXTRA_RING_OPEN);
+    refreshAll();
+
+    ensureBgmPlaying();
+    return;
+  }
+
+  floodOpen(r,c);
+  checkStagesAndClear();
+}
+
+function toggleFlag(r,c){
   if(gameOver) return;
   if(opened[r][c]) return;
 
-  usedFlag=true;
   flags[r][c]=!flags[r][c];
+  usedFlag = usedFlag || flags[r][c];
+
+  /* ★ここが要望：旗を立てた/外した時に効果音 */
   play(seFlag);
-  render();
-  checkClear();
+
+  updateCellView(r,c);
+  checkStagesAndClear();
 }
 
-function revealAllEnemies(){
-  for(let r=0;r<ROWS;r++){
-    for(let c=0;c<COLS;c++){
-      if(board[r][c]===-1) opened[r][c]=true;
-    }
-  }
-}
-
-/* ===== progress messages ===== */
-function remainingSafeCells(){
-  let remain=0;
-  for(let r=0;r<ROWS;r++){
-    for(let c=0;c<COLS;c++){
-      if(board[r][c]!==-1 && !opened[r][c]) remain++;
-    }
-  }
-  return remain;
-}
-function countOpenedSafeCells(){
-  let n=0;
-  for(let r=0;r<ROWS;r++){
-    for(let c=0;c<COLS;c++){
-      if(board[r][c]!==-1 && opened[r][c]) n++;
-    }
-  }
-  return n;
-}
-function totalSafeCells(){ return ROWS*COLS - ENEMIES; }
-
-function updateProgressMessages(){
-  if(!started || gameOver) return;
-
-  const openedSafe=countOpenedSafeCells();
-  const totalSafe=totalSafeCells();
-
-  if(!halfShown && openedSafe >= Math.ceil(totalSafe/2)){
-    halfShown=true;
-    statusEl.textContent="やっと半分だ！";
-  }
-
-  const remain=remainingSafeCells();
-  if(!lastTenShown && remain>0 && remain<10){
-    lastTenShown=true;
-    statusEl.textContent="あと少し！！";
-  }
-}
-
-/* ===== endgame effects (3 stages) ===== */
-function showLastOneHypeOnce(){
+function showHypeOnce(text){
+  hypeText.textContent=text;
   hype.classList.add("show");
-  setTimeout(()=>hype.classList.remove("show"), 900);
+  setTimeout(()=>hype.classList.remove("show"),900);
 }
-
-function updateEndgameEffects(){
-  if(!started || gameOver) return;
-
-  const remain=remainingSafeCells();
-
-  // ステージ判定
-  let stage=0;
-  if(remain>0 && remain<=10) stage=1;
-  if(remain>0 && remain<=3)  stage=2;
-  if(remain===1)             stage=3;
-
-  // 盤面クラス更新
+function setStage(stage){
   game.classList.remove("stage1","stage2","stage3");
   if(stage===1) game.classList.add("stage1");
   if(stage===2) game.classList.add("stage2");
   if(stage===3) game.classList.add("stage3");
+}
 
-  // 画像切り替え（煽り段階）
-  setExplorerImageByStage(stage);
+function checkStagesAndClear(){
+  const rem=remainingSafeCells();
 
-  // BGM切替（残り<=10）
-  const shouldLast = stage>=1;
-  if(shouldLast && !lastMode){
-    lastMode=true;
-    if(isAnyBgmPlaying()){
-      bgm.pause();
-      lastBgm.currentTime=0;
-      lastBgm.play().catch(()=>{});
-    }
-  }
-  if(!shouldLast && lastMode){
-    lastMode=false;
-    if(isAnyBgmPlaying()){
-      lastBgm.pause();
-      bgm.currentTime=0;
-      bgm.play().catch(()=>{});
-    }
+  if(rem<=10 && stageShown<1){
+    stageShown=1;
+    setStage(1);
+    explorer.src=IMG_HYPE1;
+    statusEl.textContent="早く宇宙船に戻らないと...!";
+    switchBgmMode(true);
   }
 
-  // 段階突入時のメッセージ
-  if(stage > stageShown){
-    stageShown = stage;
-    if(stage===2){
-      statusEl.textContent="急がないと惑星が爆発する！";
-    }else if(stage===3){
-      // 3段階目突入
-      showLastOneHypeOnce();
-      statusEl.textContent="早く脱出しないとぉぉぉっっ！！！";
-    }
+  if(rem<=3 && stageShown<2){
+    stageShown=2;
+    setStage(2);
+    explorer.src=IMG_HYPE2;
+    statusEl.textContent="もう少しだ…！";
   }
 
-  // 3段階目は「もう1つの文言」も出したい要望があったため、交互表示
-  if(stage===3){
-    const t = Date.now();
-    statusEl.textContent = (Math.floor(t/1200)%2===0)
-      ? "早く宇宙船に戻らないと！！"
-      : "早く脱出しないとぉぉぉっっ！！！";
+  if(rem<=1 && stageShown<3){
+    stageShown=3;
+    setStage(3);
+    explorer.src=IMG_HYPE3;
+    statusEl.textContent="早く脱出しないとおぉっっっ！！！";
+    showHypeOnce("早く脱出しないとおぉっっっ！！！");
+  }
+
+  if(rem===0 && !gameOver){
+    gameOver=true;
+    stopHypeBgmOnClear();
+    setStage(0);
+
+    statusEl.classList.add("clear");
+    explorer.classList.remove("captured","perfect");
+
+    if(!usedFlag){
+      statusEl.textContent="PERFECT！！";
+      explorer.src=IMG_PERFECT;
+      explorer.classList.add("perfect");
+      play(sePerfect);
+    }else{
+      statusEl.textContent="CLEAR！！";
+      explorer.src=IMG_CLEAR;
+      play(clear1);
+      setTimeout(()=>play(clear2),220);
+    }
   }
 }
 
-/* ===== clear ===== */
-function checkClear(){
-  if(gameOver) return;
-  if(!started) return;
+function init(){
+  lastMode=false;
+  ensureBgmPlaying();
 
-  for(let r=0;r<ROWS;r++){
-    for(let c=0;c<COLS;c++){
-      if(board[r][c]!==-1 && !opened[r][c]) return;
-    }
-  }
+  gameOver=false;
+  usedFlag=false;
+  started=false;
+  stageShown=0;
 
-  gameOver=true;
-  statusEl.textContent="任務成功！！";
-  statusEl.classList.add("clear");
+  alienPos=null;
+  alienFound=false;
 
-  stopAllBgm();
-  setBgmButtonText(false);
+  explorer.src=IMG_NORMAL;
+  explorer.classList.remove("captured","perfect");
+  statusEl.classList.remove("clear");
+  statusEl.textContent="探索開始！";
 
-  if(!usedFlag){
-    explorer.src = IMG_PERFECT;
-    explorer.classList.add("perfect");
-    play(sePerfect);
-  }else{
-    explorer.src = IMG_CLEAR;
-    play(Math.random()<0.5 ? clear1 : clear2);
-  }
+  board=Array.from({length:ROWS},()=>Array(COLS).fill(0));
+  opened=Array.from({length:ROWS},()=>Array(COLS).fill(false));
+  flags =Array.from({length:ROWS},()=>Array(COLS).fill(false));
+
+  game.classList.remove("stage1","stage2","stage3");
+  render();
+  refreshAll();
+  setBgmButtonText();
 }
 
 init();
 </script>
 </body>
 </html>
+```
