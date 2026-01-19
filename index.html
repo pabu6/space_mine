@@ -1,3 +1,4 @@
+```html
 <!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -47,12 +48,15 @@ body{
 
   #side{ order:1; width:92vw; padding:8px; }
 
-  /* 画像が大きすぎて盤面が入らない対策 */
+  /*
+    ★画像を「スクロールしないギリギリ」まで大きく
+    - height を上げる（端末差を吸収するため max-height も上げる）
+  */
   #explorer{
     width:auto;
-    max-width:78vw;
-    height:18vh;
-    max-height:160px;
+    max-width:86vw;
+    height:24vh;        /* 18vh -> 24vh（大きく） */
+    max-height:220px;   /* 160px -> 220px（大きく） */
     object-fit:contain;
     display:block;
     margin:0 auto;
@@ -60,11 +64,12 @@ body{
 
   #status{ margin-top:6px; font-size:16px; }
 
+  /* 盤面がはみ出さないように計算を更新 */
   #game{
     order:2;
     width:92vw;
     padding:6px;
-    max-height:calc(100vh - 56px - 18vh - 90px);
+    max-height:calc(100vh - 56px - 24vh - 100px);
     overflow:hidden;
   }
 }
@@ -283,10 +288,10 @@ const IMG_DEATH    = "explorer.jpeg";
 const EXTRA_RING_OPEN = 3;
 
 /*
-  ★宇宙人が「クリックしてないのに出てくる」原因は、
-  0の連鎖（floodOpen）で宇宙人マスまで自動で開いてしまうこと。
-  → 対策：floodOpenの探索で「宇宙人マスはキューに入れない（自動開放しない）」。
-  これで必ず「そのマスを直接クリックした時だけ」宇宙人が出ます。
+  要望：
+  - PCは触らない → CSS/挙動は max-width:767px の中だけ変更、JSは共通だがPCの見た目は不変
+  - スマホでRESTARTのたびにBGMが止まる → init()でBGMを止めない（ユーザーのON/OFF状態を維持）
+    さらに「残り10以下でlastBgmに切り替える」時も、鳴っていたら切替、鳴ってなければ鳴らさない。
 */
 
 let board=[], opened=[], flags=[];
@@ -297,7 +302,7 @@ let started=false;
 let lastMode=false;
 let stageShown=0;
 
-let alienPos=null;     // [r,c]
+let alienPos=null;
 let alienFound=false;
 
 const game=document.getElementById("game");
@@ -326,27 +331,21 @@ function play(se){
   try{ se.currentTime=0; se.play().catch(()=>{}); }catch(e){}
 }
 function stopAllBgm(){ bgm.pause(); lastBgm.pause(); }
+function isAnyBgmPlaying(){ return (!bgm.paused) || (!lastBgm.paused); }
 function setBgmButtonText(on){
   const t = on ? "BGM OFF" : "BGM ON";
   bgmToggle.textContent=t;
   bgmToggleTop.textContent=t;
 }
-function isAnyBgmPlaying(){ return (!bgm.paused) || (!lastBgm.paused); }
+function getCurrentBgm(){ return lastMode ? lastBgm : bgm; }
 function startBgmIfPossible(){
-  const target = lastMode ? lastBgm : bgm;
+  const target=getCurrentBgm();
   target.play().then(()=>setBgmButtonText(true)).catch(()=>setBgmButtonText(false));
-}
-function switchBgmMode(toLast){
-  if(lastMode === toLast) return;
-  lastMode = toLast;
-  if(isAnyBgmPlaying()){
-    stopAllBgm();
-    startBgmIfPossible();
-  }
 }
 function toggleBGM(){
   if(isAnyBgmPlaying()){
-    stopAllBgm(); setBgmButtonText(false);
+    stopAllBgm();
+    setBgmButtonText(false);
   }else{
     startBgmIfPossible();
   }
@@ -354,10 +353,24 @@ function toggleBGM(){
 bgmToggle.onclick=toggleBGM;
 bgmToggleTop.onclick=toggleBGM;
 
-/* 自動再生制限対策 */
+/* スマホ自動再生制限対策：最初の1回だけ押下でBGM開始（OFFにしたい人はボタンで止める） */
 document.addEventListener("pointerdown", ()=>{
   if(!isAnyBgmPlaying()) startBgmIfPossible();
 },{once:true});
+
+/* 残り10以下でlastBgmへ切替：鳴っている時だけ切替（止まってるなら鳴らさない） */
+function switchBgmMode(toLast){
+  if(lastMode === toLast) return;
+  const wasPlaying = isAnyBgmPlaying();
+  stopAllBgm();
+  lastMode = toLast;
+  if(wasPlaying){
+    startBgmIfPossible();
+  }else{
+    // OFF状態は維持
+    setBgmButtonText(false);
+  }
+}
 
 /* 右クリック/長押しメニュー抑止 */
 document.addEventListener("contextmenu", (e)=>e.preventDefault());
@@ -500,7 +513,6 @@ function updateCellView(r,c){
     return;
   }
 
-  // 宇宙人は「開かれた後」だけ表示される（openedがtrueの時だけここに来る）
   if(isAlienCell(r,c)){
     td.classList.add("open","alien");
     td.textContent="";
@@ -537,8 +549,6 @@ function floodOpen(sr,sc){
     flags[r][c]=false;
     updateCellView(r,c);
 
-    // 宇宙人マスはここに来るのは「クリックで開かれた時だけ」だが
-    // 念のため拡散は止める
     if(isAlienCell(r,c)) continue;
 
     if(board[r][c]!==0) continue;
@@ -549,7 +559,7 @@ function floodOpen(sr,sc){
       if(opened[nr][nc]) continue;
       if(flags[nr][nc]) continue;
 
-      // ★重要：宇宙人マスは自動連鎖で開けない（クリック必須）
+      // 宇宙人マスは連鎖で開かない（クリック必須）
       if(isAlienCell(nr,nc)) continue;
 
       seen.add(k);
@@ -583,7 +593,7 @@ function openCell(r,c){
 
   play(seOpen);
 
-  // 宇宙人：そのマスを「直接クリック」した時だけ出る
+  // 宇宙人：そのマスを直接クリックした時だけ出る
   if(isAlienCell(r,c)){
     opened[r][c]=true;
     alienFound=true;
@@ -658,7 +668,6 @@ function checkStagesAndClear(){
     statusEl.textContent="もう少しだ…！";
   }
 
-  // 最後の1マス
   if(rem<=1 && stageShown<3){
     stageShown=3;
     setStage(3);
@@ -670,8 +679,9 @@ function checkStagesAndClear(){
   if(rem===0 && !gameOver){
     gameOver=true;
     setStage(0);
-    stopAllBgm();
-    setBgmButtonText(false);
+
+    // クリア時はBGM止める仕様は好みが分かれるので「止めない」に変更したいならここをコメントアウト
+    // stopAllBgm(); setBgmButtonText(false);
 
     statusEl.classList.add("clear");
     explorer.classList.remove("captured");
@@ -692,10 +702,26 @@ function checkStagesAndClear(){
 }
 
 function init(){
+  // ★BGMは止めない（RESTARTしても流れ続ける）
+  // stopAllBgm(); setBgmButtonText(false); ← これをやらない
+
+  // lastModeはゲーム演出用なので初期化するが、
+  // いま鳴っているBGMがあれば「通常BGM」に戻すかどうかは好み：
+  // 今回は「新規ゲーム開始時は通常BGMに戻す。ただし鳴ってるなら切替、鳴ってないならそのまま」を採用。
+  const wasPlaying = isAnyBgmPlaying();
+  if(lastMode){
+    stopAllBgm();
+  }
+  lastMode=false;
+  if(wasPlaying){
+    startBgmIfPossible(); // 通常BGMへ
+  }else{
+    setBgmButtonText(false);
+  }
+
   gameOver=false;
   usedFlag=false;
   started=false;
-  lastMode=false;
   stageShown=0;
 
   alienPos=null;
@@ -705,9 +731,6 @@ function init(){
   explorer.classList.remove("captured","perfect");
   statusEl.classList.remove("clear");
   statusEl.textContent="探索開始！";
-
-  stopAllBgm();
-  setBgmButtonText(false);
 
   board = Array.from({length:ROWS},()=>Array(COLS).fill(0));
   opened = Array.from({length:ROWS},()=>Array(COLS).fill(false));
@@ -723,3 +746,4 @@ init();
 </script>
 </body>
 </html>
+```
