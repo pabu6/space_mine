@@ -14,6 +14,7 @@ body{
   -webkit-touch-callout:none; -webkit-user-select:none;
   -khtml-user-select:none; -moz-user-select:none;
   -ms-user-select:none; user-select:none;
+  overflow-x:hidden;
 }
 
 #container{display:flex;min-height:100vh;}
@@ -27,12 +28,12 @@ body{
   #container{flex-direction:column;align-items:center;}
   #side{
     order:-1; width:90%; display:flex; flex-direction:column; align-items:center;
-    margin-bottom:8px;
+    margin-bottom:4px;
   }
-  #explorer{width:40vw; margin-bottom:8px;}
-  #buttonsWrapper{display:flex; gap:8px;} /* 横並びにする */
+  #explorer{width:32vw; margin-bottom:4px;} /* 少し小さく */
+  #buttonsWrapper{display:flex; gap:8px;}
   #restart,#bgmToggle{width:auto; font-size:14px; padding:6px 12px;}
-  #game{width:90vw; max-width:90vw;}
+  #game{width:90vw; max-width:90vw; height:auto; overflow:hidden;}
 }
 
 /* --- ゲーム盤面 --- */
@@ -203,13 +204,13 @@ function draw(){
         if(gameOver||opened[r][c]) return;
         longPress=false;
         pressTimer=setTimeout(()=>{
-          flags[r][c]=!flags[r][c]; usedFlag=true; longPress=true; play(seFlag); draw(); checkLast2();
+          flags[r][c]=!flags[r][c]; usedFlag=true; longPress=true; play(seFlag); draw(); checkLast2(true);
         },500);
       });
       td.addEventListener("touchend", ()=>clearTimeout(pressTimer));
       td.addEventListener("touchmove", ()=>clearTimeout(pressTimer));
       td.onclick=()=>{ if(longPress) return; if(!gameOver && !flags[r][c]){ openCell(r,c); draw(); } };
-      td.oncontextmenu=e=>{ e.preventDefault(); if(!opened[r][c]&&!gameOver){ flags[r][c]=!flags[r][c]; usedFlag=true; play(seFlag); draw(); checkLast2(); } };
+      td.oncontextmenu=e=>{ e.preventDefault(); if(!opened[r][c]&&!gameOver){ flags[r][c]=!flags[r][c]; usedFlag=true; play(seFlag); draw(); checkLast2(true); } };
       tr.appendChild(td);
     }
     table.appendChild(tr);
@@ -237,16 +238,15 @@ function openCell(r,c){
       }
     }
   }
-  checkLast2(); checkClear();
+  checkLast2(true); checkClear();
 }
 
-function checkLast2(){
-  let safe=ROWS*COLS-ENEMIES, count=0, unopenedBomb=0;
+function checkLast2(ignoreFlag=false){
+  let safe=ROWS*COLS-ENEMIES, count=0;
   for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++){
     if(opened[r][c] && board[r][c]!=="E") count++;
-    if(!opened[r][c] && board[r][c]==="E" && !flags[r][c]) unopenedBomb++;
   }
-  let remaining = safe - count + unopenedBomb;
+  let remaining = safe - count;
   if(remaining<=2 && !lastMode){
     lastMode=true; game.classList.add("last-dark");
     if(!gameOver){ bgm.pause(); lastBgm.currentTime=0; lastBgm.play().catch(()=>{}); }
