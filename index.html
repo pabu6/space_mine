@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>宇宙探査マインスイーパー</title>
+
 <style>
 :root{--cell-size:36px;}
 body{
@@ -11,176 +12,192 @@ body{
   font-family:sans-serif;
   background:url("space.jpg") center/cover no-repeat fixed;
   color:#fff;
-  -webkit-touch-callout:none; -webkit-user-select:none;
-  -khtml-user-select:none; -moz-user-select:none;
-  -ms-user-select:none; user-select:none;
-  overflow-x:hidden;
+  user-select:none;
 }
-
 #container{display:flex;min-height:100vh;}
+
 @media(min-width:768px){
   #container{justify-content:center;align-items:center;gap:32px;}
   :root{--cell-size:48px;}
 }
-
 @media(max-width:767px){
-  :root{--cell-size:min(9vw,40px);}
+  :root{--cell-size:min(9vw,38px);}
   #container{flex-direction:column;align-items:center;}
-  #side{
-    order:-1; width:90%; display:flex; flex-direction:column; align-items:center;
-    margin-bottom:4px;
-  }
-  #explorer{width:32vw; margin-bottom:4px;} /* 少し小さく */
-  #buttonsWrapper{display:flex; gap:8px;}
-  #restart,#bgmToggle{width:auto; font-size:14px; padding:6px 12px;}
-  #game{width:90vw; max-width:90vw; height:auto; overflow:hidden;}
+  #explorer{width:26vw;}
+  #game{width:90vw;}
 }
 
-/* --- ゲーム盤面 --- */
 #game{
   padding:10px;
   background:rgba(0,0,20,.6);
   border-radius:6px;
   position:relative;
-  transition:filter .5s;
 }
-#game.last-dark{
-  filter:brightness(0.5) contrast(1.2);
-  animation:heartbeat 1s infinite;
+#game.last-flash{animation:boardFlash .9s infinite;}
+@keyframes boardFlash{
+  0%,100%{filter:brightness(.55);}
+  50%{filter:brightness(.9);}
 }
-@keyframes heartbeat{0%,100%{filter:brightness(0.5);}50%{filter:brightness(0.7);}}
 
 table{border-collapse:collapse;}
 td{
-  width:var(--cell-size); height:var(--cell-size);
-  border:1px solid #111144; background:#1a1a3d;
-  text-align:center; font-weight:bold;
-  cursor:pointer; font-size:calc(var(--cell-size)*0.5); color:#fff;
+  width:var(--cell-size);
+  height:var(--cell-size);
+  border:1px solid #111144;
+  background:#1a1a3d;
+  text-align:center;
+  font-weight:bold;
+  cursor:pointer;
+  font-size:calc(var(--cell-size)*0.5);
 }
-td:hover{background:#2a2a5a;} td.open{background:#33334d; cursor:default;}
-.num1{color:#66ccff;} .num2{color:#33ff77;} .num3{color:#ff6666;} .num4{color:#cc66ff;}
-.num5{color:#ffcc66;} .num6{color:#00cccc;} .num7{color:#aaaaaa;} .num8{color:#ffffff;}
-td.flag{background:#111144;color:#0f0;} td.enemy{background:black url("asteroid.jpeg") center/cover no-repeat;animation:pop .4s ease;}
+td.open{background:#33334d;cursor:default;}
+td.flag{background:#111144;color:#0f0;}
+td.enemy{background:black url("asteroid.jpeg") center/cover no-repeat;}
 td.alien{background:url("alien.jpeg") center/cover no-repeat;}
-@keyframes pop{0%{transform:scale(1);}50%{transform:scale(1.2);}100%{transform:scale(1);}}
 
-#side{background:rgba(5,5,20,.7);padding:12px;text-align:center;border-radius:8px;}
-@media(min-width:768px){#side{width:300px;}}
-#explorer{width:min(320px,90vw);transition:.4s;cursor:default;}
-#explorer.perfect{border:6px solid gold;border-radius:14px;box-shadow:0 0 30px gold;cursor:pointer;}
+.num1{color:#66ccff;}
+.num2{color:#33ff77;}
+.num3{color:#ff6666;}
+.num4{color:#cc66ff;}
+.num5{color:#ffcc66;}
+.num6{color:#00cccc;}
+.num7{color:#aaaaaa;}
+.num8{color:#ffffff;}
+
+#side{
+  background:rgba(5,5,20,.7);
+  padding:12px;
+  text-align:center;
+  border-radius:8px;
+}
+#explorer{width:min(300px,90vw);}
 #explorer.captured{filter:grayscale(40%) brightness(.8);}
+#explorer.perfect{
+  border:6px solid gold;
+  border-radius:14px;
+  box-shadow:0 0 30px gold;
+}
+
 #status{margin-top:8px;font-size:18px;font-weight:bold;}
 #status.clear{color:gold;text-shadow:0 0 8px gold;}
 
-#buttonsWrapper{margin-top:8px;}
-button{margin-top:0;padding:8px 16px;font-size:16px;background:#1a1a3d;border:none;color:white;cursor:pointer;}
-
-#zoomOverlay{position:fixed;inset:0;background:rgba(0,0,0,.85);display:none;justify-content:center;align-items:center;z-index:9999;}
-#zoomOverlay img{max-width:90vw;max-height:90vh;border:8px solid gold;border-radius:16px;box-shadow:0 0 40px gold;}
-#goldFlash{position:absolute;inset:0;background:gold;opacity:0;animation:flash .8s ease;}
-@keyframes flash{0%{opacity:0;}30%{opacity:.4;}100%{opacity:0;}}
-#flashOverlay{position:absolute;inset:0;background:white;opacity:0;pointer-events:none;z-index:999;}
-.flashAnim{animation:flashPulse 1s infinite;}
-@keyframes flashPulse{0%,100%{opacity:0;}50%{opacity:0.1;}}
-#boardMessage{position:absolute;inset:0;display:flex;justify-content:center;align-items:center;text-align:center;font-size:34px;font-weight:bold;color:gold;background:rgba(0,0,0,.45);text-shadow:0 0 10px black,0 0 18px gold;pointer-events:none;z-index:10;}
+#buttons{
+  margin-top:8px;
+  display:flex;
+  gap:8px;
+  justify-content:center;
+}
+button{
+  padding:8px 14px;
+  font-size:14px;
+  background:#1a1a3d;
+  border:none;
+  color:white;
+  cursor:pointer;
+}
 </style>
 </head>
+
 <body>
 <div id="container">
   <div id="game"></div>
+
   <div id="side">
     <img id="explorer" src="explorer.jpeg">
     <div id="status">探索開始！</div>
-    <div id="buttonsWrapper">
+    <div id="buttons">
       <button id="restart">RESTART</button>
       <button id="bgmToggle">BGM OFF</button>
     </div>
   </div>
 </div>
 
-<div id="zoomOverlay"><img id="zoomImage"></div>
-<div id="flashOverlay"></div>
-
 <!-- AUDIO -->
 <audio id="seOpen" src="open.mp3"></audio>
 <audio id="seFlag" src="flag.mp3"></audio>
 <audio id="seDeath" src="death.mp3"></audio>
 <audio id="sePerfect" src="perfect.mp3"></audio>
-<audio id="bgm" src="bgm.mp3" loop></audio>
-<audio id="lastBgm" src="last.mp3" loop></audio>
 <audio id="alienSound" src="alienSound.mp3"></audio>
 <audio id="clear1" src="clear1.mp3"></audio>
 <audio id="clear2" src="clear2.mp3"></audio>
+<audio id="bgm" src="bgm.mp3" loop></audio>
+<audio id="lastBgm" src="last.mp3" loop></audio>
 
 <script>
-const ROWS=9, COLS=9, ENEMIES=12;
-let board=[], opened=[], flags=[], gameOver=false;
-let usedFlag=false, lastMode=false, alienPlaced=false;
+const ROWS=9, COLS=9, ENEMIES=10;
+let board=[],opened=[],flags=[];
+let gameOver=false,lastMode=false,usedFlag=false;
 
 const game=document.getElementById("game");
 const explorer=document.getElementById("explorer");
 const status=document.getElementById("status");
-const bgmToggle=document.getElementById("bgmToggle");
-const zoomOverlay=document.getElementById("zoomOverlay");
-const zoomImage=document.getElementById("zoomImage");
-const flashOverlay=document.getElementById("flashOverlay");
 
 const bgm=document.getElementById("bgm");
 const lastBgm=document.getElementById("lastBgm");
+const bgmToggle=document.getElementById("bgmToggle");
+
 const seOpen=document.getElementById("seOpen");
 const seFlag=document.getElementById("seFlag");
 const seDeath=document.getElementById("seDeath");
 const sePerfect=document.getElementById("sePerfect");
 const alienSound=document.getElementById("alienSound");
+const clear1=document.getElementById("clear1");
+const clear2=document.getElementById("clear2");
 
 function play(se){se.currentTime=0;se.play().catch(()=>{});}
-function playBGM(){bgm.play().catch(()=>{}); bgmToggle.textContent="BGM OFF";}
-function stopAllBGM(){bgm.pause(); lastBgm.pause();}
 
-bgmToggle.onclick=()=>{if(!bgm.paused||!lastBgm.paused){stopAllBGM(); bgmToggle.textContent="BGM ON";}else{playBGM();}};
-window.addEventListener("load",playBGM);
-document.body.addEventListener("click",playBGM,{once:true});
-document.body.addEventListener("touchstart",playBGM,{once:true});
+bgmToggle.onclick=()=>{
+  if(!bgm.paused||!lastBgm.paused){
+    bgm.pause(); lastBgm.pause();
+    bgmToggle.textContent="BGM ON";
+  }else{
+    bgm.play().catch(()=>{});
+    bgmToggle.textContent="BGM OFF";
+  }
+};
 
-explorer.onclick=()=>{if(!explorer.classList.contains("perfect"))return; zoomImage.src=explorer.src; zoomOverlay.style.display="flex";};
-zoomOverlay.onclick=()=>zoomOverlay.style.display="none";
 document.getElementById("restart").onclick=init;
 
 function init(){
   board=Array.from({length:ROWS},()=>Array(COLS).fill(0));
   opened=Array.from({length:ROWS},()=>Array(COLS).fill(false));
   flags=Array.from({length:ROWS},()=>Array(COLS).fill(false));
-  gameOver=false; usedFlag=false; lastMode=false; alienPlaced=false;
+  gameOver=false;lastMode=false;usedFlag=false;
 
-  stopAllBGM(); playBGM();
-  game.classList.remove("last-dark");
-  explorer.src="explorer.jpeg"; explorer.className="";
-  status.textContent="探索開始！"; status.className="";
-  flashOverlay.classList.remove("flashAnim");
-  let old=document.getElementById("boardMessage"); if(old) old.remove();
+  game.classList.remove("last-flash");
+  explorer.src="explorer.jpeg";
+  explorer.className="";
+  status.textContent="探索開始！";
+  status.classList.remove("clear");
 
-  // 爆弾配置
   let placed=0;
   while(placed<ENEMIES){
-    let r=Math.floor(Math.random()*ROWS), c=Math.floor(Math.random()*COLS);
-    if(board[r][c]!=="E"){ board[r][c]="E"; placed++; }
+    let r=Math.random()*ROWS|0,c=Math.random()*COLS|0;
+    if(board[r][c]!=="E"){board[r][c]="E";placed++;}
   }
 
-  // 数字配置
   for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++){
-    if(board[r][c]==="E") continue;
+    if(board[r][c]==="E")continue;
     let n=0;
     for(let dr=-1;dr<=1;dr++)for(let dc=-1;dc<=1;dc++){
       let nr=r+dr,nc=c+dc;
-      if(nr>=0&&nr<ROWS&&nc>=0&&nc<COLS && board[nr][nc]==="E") n++;
+      if(nr>=0&&nr<ROWS&&nc>=0&&nc<COLS&&board[nr][nc]==="E")n++;
     }
     board[r][c]=n;
   }
 
-  // 宇宙人1体配置
-  const emptyCells=[];
-  for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++){ if(board[r][c]===0) emptyCells.push([r,c]); }
-  if(emptyCells.length>0){ const [ar,ac]=emptyCells[Math.floor(Math.random()*emptyCells.length)]; board[ar][ac]='A'; alienPlaced=true; }
+  const zeros=[];
+  for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++){
+    if(board[r][c]===0) zeros.push([r,c]);
+  }
+  if(zeros.length){
+    const [ar,ac]=zeros[Math.random()*zeros.length|0];
+    board[ar][ac]="A";
+  }
+
+  bgm.currentTime=0;
+  bgm.play().catch(()=>{});
+  bgmToggle.textContent="BGM OFF";
 
   draw();
 }
@@ -188,29 +205,39 @@ function init(){
 function draw(){
   game.innerHTML="";
   const table=document.createElement("table");
+
   for(let r=0;r<ROWS;r++){
     const tr=document.createElement("tr");
     for(let c=0;c<COLS;c++){
       const td=document.createElement("td");
+
       if(opened[r][c]){
         td.classList.add("open");
         if(board[r][c]==="E") td.classList.add("enemy");
         else if(board[r][c]==="A") td.classList.add("alien");
-        else if(board[r][c]>0){ td.textContent=board[r][c]; td.classList.add("num"+board[r][c]); }
-      } else if(flags[r][c]){ td.classList.add("flag"); td.textContent="🚩"; }
+        else if(board[r][c]>0){
+          td.textContent=board[r][c];
+          td.classList.add("num"+board[r][c]);
+        }
+      }else if(flags[r][c]){
+        td.classList.add("flag");
+        td.textContent="🚩";
+      }
 
-      let pressTimer=null, longPress=false;
-      td.addEventListener("touchstart", e=>{
-        if(gameOver||opened[r][c]) return;
-        longPress=false;
-        pressTimer=setTimeout(()=>{
-          flags[r][c]=!flags[r][c]; usedFlag=true; longPress=true; play(seFlag); draw(); checkLast2(true);
-        },500);
-      });
-      td.addEventListener("touchend", ()=>clearTimeout(pressTimer));
-      td.addEventListener("touchmove", ()=>clearTimeout(pressTimer));
-      td.onclick=()=>{ if(longPress) return; if(!gameOver && !flags[r][c]){ openCell(r,c); draw(); } };
-      td.oncontextmenu=e=>{ e.preventDefault(); if(!opened[r][c]&&!gameOver){ flags[r][c]=!flags[r][c]; usedFlag=true; play(seFlag); draw(); checkLast2(true); } };
+      td.onclick=()=>{
+        if(gameOver||flags[r][c])return;
+        openCell(r,c);
+        draw();
+      };
+
+      td.oncontextmenu=e=>{
+        e.preventDefault();
+        flags[r][c]=!flags[r][c];
+        usedFlag=true;
+        play(seFlag);
+        draw();
+      };
+
       tr.appendChild(td);
     }
     table.appendChild(tr);
@@ -219,51 +246,83 @@ function draw(){
 }
 
 function openCell(r,c){
-  if(opened[r][c]) return;
-  if(board[r][c]==='A'){ opened[r][c]=true; alienSound.currentTime=0; alienSound.play().catch(()=>{}); draw(); checkClear(); return; }
+  if(opened[r][c])return;
+
+  if(board[r][c]==="A"){
+    opened[r][c]=true;
+    play(alienSound);
+    checkClear();
+    return;
+  }
+
   opened[r][c]=true;
-  if(board[r][c]!=="E") play(seOpen);
-  if(board[r][c]==="E"){ gameOver=true; play(seDeath); stopAllBGM(); explorer.src="explorer_captured.jpeg"; explorer.classList.add("captured"); status.textContent="ドカーン！"; for(let i=0;i<ROWS;i++)for(let j=0;j<COLS;j++) if(board[i][j]==="E") opened[i][j]=true; draw(); return; }
+
+  if(board[r][c]==="E"){
+    gameOver=true;
+    play(seDeath);
+    bgm.pause(); lastBgm.pause();
+    explorer.src="explorer_captured.jpeg";
+    explorer.classList.add("captured");
+    return;
+  }
+
+  play(seOpen);
+
   if(board[r][c]===0){
-    const queue=[[r,c]];
-    while(queue.length>0){
-      const [x,y]=queue.shift();
-      for(let dx=-1;dx<=1;dx++)for(let dy=-1;dy<=1;dy++){
-        const nx=x+dx, ny=y+dy;
-        if(nx<0||nx>=ROWS||ny<0||ny>=COLS) continue;
-        if(opened[nx][ny]||board[nx][ny]==='A') continue;
-        opened[nx][ny]=true;
-        if(board[nx][ny]>0) play(seOpen);
-        if(board[nx][ny]===0) queue.push([nx,ny]);
+    for(let dx=-1;dx<=1;dx++)for(let dy=-1;dy<=1;dy++){
+      const nx=r+dx,ny=c+dy;
+      if(nx>=0&&nx<ROWS&&ny>=0&&ny<COLS&&!opened[nx][ny]){
+        if(board[nx][ny]!=="A") openCell(nx,ny);
       }
     }
   }
-  checkLast2(true); checkClear();
+
+  checkLastOne();
+  checkClear();
 }
 
-function checkLast2(ignoreFlag=false){
-  let safe=ROWS*COLS-ENEMIES, count=0;
+function checkLastOne(){
+  let safe=ROWS*COLS-ENEMIES;
+  let openedSafe=0;
   for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++){
-    if(opened[r][c] && board[r][c]!=="E") count++;
+    if(opened[r][c] && board[r][c]!=="E") openedSafe++;
   }
-  let remaining = safe - count;
-  if(remaining<=2 && !lastMode){
-    lastMode=true; game.classList.add("last-dark");
-    if(!gameOver){ bgm.pause(); lastBgm.currentTime=0; lastBgm.play().catch(()=>{}); }
-    flashOverlay.classList.add("flashAnim");
+  if(safe-openedSafe===1 && !lastMode){
+    lastMode=true;
+    game.classList.add("last-flash");
+    bgm.pause();
+    lastBgm.currentTime=0;
+    lastBgm.play().catch(()=>{});
   }
 }
 
 function checkClear(){
-  let safe=ROWS*COLS-ENEMIES, count=0;
-  for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++) if(opened[r][c] && board[r][c]!=="E") count++;
-  if(count===safe){
-    gameOver=true; stopAllBGM(); flashOverlay.classList.remove("flashAnim"); status.classList.add("clear");
-    const playClearSounds=()=>{ const seClear1=new Audio('clear1.mp3'); const seClear2=new Audio('clear2.mp3'); seClear1.play(); seClear1.onended=()=>seClear2.play(); };
-    if(!usedFlag){ play(sePerfect); status.textContent="PERFECT CLEAR!!"; explorer.src="explorer_perfect.jpeg"; explorer.classList.add("perfect");
-      const msg=document.createElement("div"); msg.id="boardMessage"; msg.innerHTML="PERFECT CLEAR!<br>CONGRATULATIONS!!"; game.appendChild(msg);
-      const flash=document.createElement("div"); flash.id="goldFlash"; game.appendChild(flash); playClearSounds();
-    }else{ status.textContent="CONGRATULATIONS!!"; explorer.src="explorer_clear.jpeg"; playClearSounds(); }
+  let safe=ROWS*COLS-ENEMIES;
+  let openedSafe=0;
+  for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++){
+    if(opened[r][c] && board[r][c]!=="E") openedSafe++;
+  }
+
+  if(openedSafe===safe){
+    gameOver=true;
+    bgm.pause(); lastBgm.pause();
+    status.textContent="CONGRATULATIONS!!";
+    status.classList.add("clear");
+
+    clear1.currentTime=0;
+    clear1.play();
+    clear1.onended=()=>{
+      clear2.currentTime=0;
+      clear2.play();
+    };
+
+    if(!usedFlag){
+      explorer.src="explorer_perfect.jpeg";
+      explorer.classList.add("perfect");
+      play(sePerfect);
+    }else{
+      explorer.src="explorer_clear.jpeg";
+    }
   }
 }
 
