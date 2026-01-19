@@ -22,7 +22,7 @@ body{
 }
 
 /* ======================
-   レイアウト
+   レイアウト（PCはそのまま）
 ====================== */
 #container{ display:flex; height:100vh; }
 
@@ -31,16 +31,16 @@ body{
   :root{--cell-size:48px;}
 }
 
-/* ====== スマホだけ調整（PCは触らない） ====== */
+/* ======================
+   スマホだけ調整（PCは一切いじらない）
+====================== */
 @media(max-width:767px){
   :root{--cell-size:min(8.2vw,34px);}
-
-  html,body{ overflow:hidden; }
 
   #container{
     flex-direction:column;
     align-items:center;
-    padding-top:56px;
+    padding-top:56px; /* topButtons分 */
     gap:8px;
     box-sizing:border-box;
     height:100vh;
@@ -48,15 +48,12 @@ body{
 
   #side{ order:1; width:92vw; padding:8px; }
 
-  /*
-    ★画像を「スクロールしないギリギリ」まで大きく
-    - height を上げる（端末差を吸収するため max-height も上げる）
-  */
+  /* ★主人公画像を大きく（スクロール出ないギリギリ寄り） */
   #explorer{
     width:auto;
-    max-width:86vw;
-    height:24vh;        /* 18vh -> 24vh（大きく） */
-    max-height:220px;   /* 160px -> 220px（大きく） */
+    max-width:90vw;
+    height:28vh;        /* 大きく */
+    max-height:260px;   /* 大きく */
     object-fit:contain;
     display:block;
     margin:0 auto;
@@ -64,12 +61,12 @@ body{
 
   #status{ margin-top:6px; font-size:16px; }
 
-  /* 盤面がはみ出さないように計算を更新 */
+  /* 盤面がはみ出ないようにだけ制限 */
   #game{
     order:2;
     width:92vw;
     padding:6px;
-    max-height:calc(100vh - 56px - 24vh - 100px);
+    max-height:calc(100vh - 56px - 28vh - 110px);
     overflow:hidden;
   }
 }
@@ -275,6 +272,17 @@ button{
 <audio id="lastBgm" src="last.mp3" loop></audio>
 
 <script>
+/* =========================
+   仕様まとめ（要望反映）
+   - PCは触らない（CSS変更はmax-width:767px内のみ）
+   - スマホは「一度タップしたら」BGMが鳴り続ける：
+     爆弾で死亡→RESTARTしても止めない
+   - 残り10以下で lastBgm に切り替えはするが、鳴り続ける（止めない）
+   - クリア時は lastBgm（時計音など）だけ止める（前要望維持）
+   - 宇宙人はクリックした時だけ出る（0連鎖で勝手に開かない）
+   - 最後の1マスでメッセージ：早く脱出しないとおぉっっっ！！！
+========================= */
+
 const ROWS=9, COLS=9, ENEMIES=10;
 
 const IMG_NORMAL   = "explorer.jpeg";
@@ -286,13 +294,6 @@ const IMG_PERFECT  = "perfect.jpeg";
 const IMG_DEATH    = "explorer.jpeg";
 
 const EXTRA_RING_OPEN = 3;
-
-/*
-  要望：
-  - PCは触らない → CSS/挙動は max-width:767px の中だけ変更、JSは共通だがPCの見た目は不変
-  - スマホでRESTARTのたびにBGMが止まる → init()でBGMを止めない（ユーザーのON/OFF状態を維持）
-    さらに「残り10以下でlastBgmに切り替える」時も、鳴っていたら切替、鳴ってなければ鳴らさない。
-*/
 
 let board=[], opened=[], flags=[];
 let gameOver=false;
@@ -325,51 +326,78 @@ const alienSound=document.getElementById("alienSound");
 const clear1=document.getElementById("clear1");
 const clear2=document.getElementById("clear2");
 
-/* ===== サウンド ===== */
+/* ===== BGM 永続（スマホで一度鳴らしたらリスタートでも継続） ===== */
+let bgmUnlocked=false;      // 最初のタップでtrue
+let userBgmEnabled=true;    // ボタンでOFFにしたらfalse
+
 function play(se){
   if(!se) return;
   try{ se.currentTime=0; se.play().catch(()=>{}); }catch(e){}
 }
-function stopAllBgm(){ bgm.pause(); lastBgm.pause(); }
+
 function isAnyBgmPlaying(){ return (!bgm.paused) || (!lastBgm.paused); }
-function setBgmButtonText(on){
+function setBgmButtonText(){
+  const on = userBgmEnabled && bgmUnlocked;
   const t = on ? "BGM OFF" : "BGM ON";
   bgmToggle.textContent=t;
   bgmToggleTop.textContent=t;
 }
-function getCurrentBgm(){ return lastMode ? lastBgm : bgm; }
-function startBgmIfPossible(){
-  const target=getCurrentBgm();
-  target.play().then(()=>setBgmButtonText(true)).catch(()=>setBgmButtonText(false));
+
+function currentBgmEl(){
+  return lastMode ? lastBgm : bgm;
 }
+
+function stopAllBgmHard(){
+  bgm.pause(); lastBgm.pause();
+}
+
+function ensureBgmPlaying(){
+  if(!bgmUnlocked) return;
+  if(!userBgmEnabled) return;
+  // いま鳴らすべきBGMを鳴らす（既に鳴ってれば触らない）
+  const target = currentBgmEl();
+  if(!target.paused) return;
+  // もう片方が鳴っていたら止める
+  if(target === bgm && !lastBgm.paused) lastBgm.pause();
+  if(target === lastBgm && !bgm.paused) bgm.pause();
+
+  target.play().catch(()=>{ /* 自動再生制限時は無視 */ });
+}
+
 function toggleBGM(){
-  if(isAnyBgmPlaying()){
-    stopAllBgm();
-    setBgmButtonText(false);
+  // ユーザー意思でON/OFFを維持
+  userBgmEnabled = !userBgmEnabled;
+  if(!userBgmEnabled){
+    stopAllBgmHard();
   }else{
-    startBgmIfPossible();
+    ensureBgmPlaying();
   }
+  setBgmButtonText();
 }
 bgmToggle.onclick=toggleBGM;
 bgmToggleTop.onclick=toggleBGM;
 
-/* スマホ自動再生制限対策：最初の1回だけ押下でBGM開始（OFFにしたい人はボタンで止める） */
+/* スマホ自動再生制限対策：最初のタップでアンロックして、以降はずっと継続 */
 document.addEventListener("pointerdown", ()=>{
-  if(!isAnyBgmPlaying()) startBgmIfPossible();
+  bgmUnlocked=true;
+  setBgmButtonText();
+  ensureBgmPlaying();
 },{once:true});
 
-/* 残り10以下でlastBgmへ切替：鳴っている時だけ切替（止まってるなら鳴らさない） */
+/* 残り10以下でlastBgmへ切替（鳴っている/鳴っていないに関わらず「状態」を維持して再生） */
 function switchBgmMode(toLast){
   if(lastMode === toLast) return;
-  const wasPlaying = isAnyBgmPlaying();
-  stopAllBgm();
   lastMode = toLast;
-  if(wasPlaying){
-    startBgmIfPossible();
-  }else{
-    // OFF状態は維持
-    setBgmButtonText(false);
-  }
+  // 「一度タップしたら流れ続ける」方針なので、条件を満たすなら確実に鳴らす
+  ensureBgmPlaying();
+}
+
+/* クリア時：時計音(lastBgm)だけは止める（前要望） */
+function stopHypeBgmOnClear(){
+  if(!lastBgm.paused) lastBgm.pause();
+  // 通常BGMに戻す（ただしユーザーOFFなら戻さない）
+  lastMode=false;
+  ensureBgmPlaying();
 }
 
 /* 右クリック/長押しメニュー抑止 */
@@ -509,9 +537,7 @@ function updateCellView(r,c){
     return;
   }
 
-  if(!opened[r][c]){
-    return;
-  }
+  if(!opened[r][c]) return;
 
   if(isAlienCell(r,c)){
     td.classList.add("open","alien");
@@ -550,7 +576,6 @@ function floodOpen(sr,sc){
     updateCellView(r,c);
 
     if(isAlienCell(r,c)) continue;
-
     if(board[r][c]!==0) continue;
 
     for(const [nr,nc] of neighbors(r,c)){
@@ -593,7 +618,7 @@ function openCell(r,c){
 
   play(seOpen);
 
-  // 宇宙人：そのマスを直接クリックした時だけ出る
+  // 宇宙人：そのマスを直接クリックした時だけ
   if(isAlienCell(r,c)){
     opened[r][c]=true;
     alienFound=true;
@@ -618,6 +643,9 @@ function openCell(r,c){
     }
     openExtraRing(r,c,EXTRA_RING_OPEN);
     refreshAll();
+
+    // ★死亡してもBGMは止めない（要望）
+    ensureBgmPlaying();
     return;
   }
 
@@ -678,10 +706,11 @@ function checkStagesAndClear(){
 
   if(rem===0 && !gameOver){
     gameOver=true;
-    setStage(0);
 
-    // クリア時はBGM止める仕様は好みが分かれるので「止めない」に変更したいならここをコメントアウト
-    // stopAllBgm(); setBgmButtonText(false);
+    // クリア後に時計音が鳴り続けない
+    stopHypeBgmOnClear();
+
+    setStage(0);
 
     statusEl.classList.add("clear");
     explorer.classList.remove("captured");
@@ -702,22 +731,10 @@ function checkStagesAndClear(){
 }
 
 function init(){
-  // ★BGMは止めない（RESTARTしても流れ続ける）
-  // stopAllBgm(); setBgmButtonText(false); ← これをやらない
-
-  // lastModeはゲーム演出用なので初期化するが、
-  // いま鳴っているBGMがあれば「通常BGM」に戻すかどうかは好み：
-  // 今回は「新規ゲーム開始時は通常BGMに戻す。ただし鳴ってるなら切替、鳴ってないならそのまま」を採用。
-  const wasPlaying = isAnyBgmPlaying();
-  if(lastMode){
-    stopAllBgm();
-  }
+  // ★RESTARTしてもBGMは止めない（要望）
+  // lastModeはゲーム演出の状態だけ初期化（ただしBGM自体は ensureBgmPlaying が継続させる）
   lastMode=false;
-  if(wasPlaying){
-    startBgmIfPossible(); // 通常BGMへ
-  }else{
-    setBgmButtonText(false);
-  }
+  ensureBgmPlaying();
 
   gameOver=false;
   usedFlag=false;
@@ -740,6 +757,7 @@ function init(){
 
   render();
   refreshAll();
+  setBgmButtonText();
 }
 
 init();
