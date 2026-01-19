@@ -1,4 +1,3 @@
-```html
 <!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -7,9 +6,6 @@
 <title>宇宙探査マインスイーパー</title>
 
 <style>
-/* ======================
-   PC（触らない）
-====================== */
 :root{--cell-size:36px;}
 html,body{height:100%; overflow:hidden;}
 body{
@@ -24,7 +20,6 @@ body{
   touch-action:manipulation;
 }
 
-/* レイアウト */
 #container{ display:flex; height:100vh; }
 
 @media(min-width:768px){
@@ -32,15 +27,13 @@ body{
   :root{--cell-size:48px;}
 }
 
-/* ======================
-   スマホだけ最適化（PCは一切変更しない）
-====================== */
+/* スマホだけ（PCは触らない） */
 @media(max-width:767px){
   :root{
     --topbar-h:48px;
-    --gap:8px;
-    --side-pad:8px;
-    --cell-size:min(9.8vw, 38px);
+    --gap:6px;
+    --side-pad:6px;
+    --cell-size:min(9.2vw, 36px);
   }
 
   html,body{ height:100%; overflow:hidden; }
@@ -55,26 +48,23 @@ body{
     box-sizing:border-box;
   }
 
-  #side{
-    order:1;
-    width:94vw;
-    padding:var(--side-pad);
-  }
+  #side{ order:1; width:94vw; padding:var(--side-pad); }
 
   #explorer{
     width:100%;
     max-width:94vw;
-    height:32vh;
-    max-height:320px;
+    height:28vh;
+    max-height:280px;
     object-fit:contain;
     display:block;
     margin:0 auto;
+    margin-top:-6px;
   }
 
   #status{
-    margin-top:6px;
+    margin-top:4px;
     font-size:15px;
-    line-height:1.2;
+    line-height:1.15;
   }
 
   #game{
@@ -85,16 +75,14 @@ body{
       100vh
       - (var(--topbar-h) + env(safe-area-inset-top, 0px))
       - env(safe-area-inset-bottom, 0px)
-      - 32vh
-      - 82px
+      - 28vh
+      - 78px
     );
     overflow:hidden;
   }
 }
 
-/* ======================
-   上部ボタン（スマホ）
-====================== */
+/* 上部ボタン（スマホ） */
 #topButtons{display:none;}
 @media(max-width:767px){
   #topButtons{
@@ -113,24 +101,18 @@ body{
   }
 }
 
-/* ======================
-   ゲーム盤
-====================== */
+/* ゲーム盤 */
 #game{
   background:rgba(0,0,20,.6);
   border-radius:6px;
   position:relative;
   transition:box-shadow .2s, outline .2s, transform .2s;
 }
-
-/* 1段階目（残り10以下）：薄い点滅 */
 #game.stage1{ animation:boardStage1 .9s infinite; }
 @keyframes boardStage1{
   0%,100%{filter:brightness(.55);}
   50%{filter:brightness(.95);}
 }
-
-/* 2段階目（残り3以下）：黄色枠チカチカ */
 #game.stage2{
   outline:3px solid rgba(255,215,0,.95);
   box-shadow:0 0 22px rgba(255,215,0,.65);
@@ -140,19 +122,14 @@ body{
   0%,100%{filter:brightness(.85) contrast(1.1);}
   50%{filter:brightness(1.35) contrast(1.35);}
 }
-
-/* 3段階目（残り1）：赤枠で揺れる */
 #game.stage3{
   outline:4px solid rgba(255,60,60,.98);
   box-shadow:0 0 34px rgba(255,60,60,.75);
-  animation:stage3Shake .16s infinite;
+  animation:stage3Blink .22s infinite;
 }
-@keyframes stage3Shake{
-  0%{transform:translate(0,0) rotate(0deg) scale(1.01); filter:brightness(1.05) contrast(1.25);}
-  25%{transform:translate(1px,-1px) rotate(-0.4deg) scale(1.02); filter:brightness(1.2) contrast(1.45);}
-  50%{transform:translate(-1px,1px) rotate(0.4deg) scale(1.02); filter:brightness(1.35) contrast(1.6);}
-  75%{transform:translate(1px,1px) rotate(-0.3deg) scale(1.02); filter:brightness(1.2) contrast(1.45);}
-  100%{transform:translate(-1px,-1px) rotate(0.3deg) scale(1.01); filter:brightness(1.05) contrast(1.25);}
+@keyframes stage3Blink{
+  0%,100%{filter:brightness(.85) contrast(1.15); transform:scale(1.01);}
+  50%{filter:brightness(1.45) contrast(1.55); transform:scale(1.02);}
 }
 
 /* ラスト1マス煽りテロップ */
@@ -211,9 +188,7 @@ td.alien{background:url("alien.jpeg") center/cover no-repeat;}
 .num7{color:#aaaaaa;}
 .num8{color:#ffffff;}
 
-/* ======================
-   サイドUI
-====================== */
+/* サイドUI */
 #side{
   background:rgba(5,5,20,.7);
   padding:12px;
@@ -238,9 +213,7 @@ td.alien{background:url("alien.jpeg") center/cover no-repeat;}
   text-shadow:0 0 8px gold;
 }
 
-/* ======================
-   ボタン
-====================== */
+/* ボタン */
 button{
   padding:8px 14px;
   font-size:14px;
@@ -285,12 +258,16 @@ button{
 
 <!-- AUDIO -->
 <audio id="seOpen" src="open.mp3"></audio>
-<audio id="seFlag" src="flag.mp3"></audio> <!-- ★旗の効果音（これを鳴らす） -->
+<audio id="seFlag" src="flag.mp3"></audio>
 <audio id="seDeath" src="death.mp3"></audio>
 <audio id="sePerfect" src="perfect.mp3"></audio>
 <audio id="alienSound" src="alienSound.mp3"></audio>
 <audio id="clear1" src="clear1.mp3"></audio>
 <audio id="clear2" src="clear2.mp3"></audio>
+
+<!-- PERFECT専用音声（保存名：perfectClear.mp3） -->
+<audio id="perfectClear" src="perfectClear.mp3"></audio>
+
 <audio id="bgm" src="bgm.mp3" loop></audio>
 <audio id="lastBgm" src="last.mp3" loop></audio>
 
@@ -303,7 +280,7 @@ const IMG_HYPE2    = "hype2.jpeg";
 const IMG_HYPE3    = "hype3.jpeg";
 const IMG_CLEAR    = "clear.jpeg";
 const IMG_PERFECT  = "perfect.jpeg";
-const IMG_DEATH    = "explorer.jpeg";
+const IMG_DEATH    = "death.jpeg";
 
 const EXTRA_RING_OPEN = 3;
 
@@ -316,7 +293,6 @@ let lastMode=false;
 let stageShown=0;
 
 let alienPos=null;
-let alienFound=false;
 
 const game=document.getElementById("game");
 const explorer=document.getElementById("explorer");
@@ -331,21 +307,34 @@ const bgmToggle=document.getElementById("bgmToggle");
 const bgmToggleTop=document.getElementById("bgmToggleTop");
 
 const seOpen=document.getElementById("seOpen");
-const seFlag=document.getElementById("seFlag"); // ★追加：旗SE参照
+const seFlag=document.getElementById("seFlag");
 const seDeath=document.getElementById("seDeath");
 const sePerfect=document.getElementById("sePerfect");
 const alienSound=document.getElementById("alienSound");
 const clear1=document.getElementById("clear1");
 const clear2=document.getElementById("clear2");
+const perfectClear=document.getElementById("perfectClear");
 
-/* ===== BGM：スマホで一度タップしたら死んでもRESTARTでも継続 ===== */
-let bgmUnlocked=false;
-let userBgmEnabled=true;
+/* 音量 */
+seOpen.volume=0.9;
+seFlag.volume=0.9;
+seDeath.volume=1.0;
+alienSound.volume=1.0;
+clear1.volume=1.0;
+clear2.volume=1.0;
+sePerfect.volume=1.0;
+perfectClear.volume=1.0;
 
 function play(se){
   if(!se) return;
   try{ se.currentTime=0; se.play().catch(()=>{}); }catch(e){}
 }
+function stopAllBgm(){ bgm.pause(); lastBgm.pause(); }
+
+/* BGM：1回タップで継続（ただしクリア時は止める） */
+let bgmUnlocked=false;
+let userBgmEnabled=true;
+
 function setBgmButtonText(){
   const on = bgmUnlocked && userBgmEnabled;
   const t = on ? "BGM OFF" : "BGM ON";
@@ -363,7 +352,7 @@ function ensureBgmPlaying(){
 }
 function toggleBGM(){
   userBgmEnabled=!userBgmEnabled;
-  if(!userBgmEnabled){ bgm.pause(); lastBgm.pause(); }
+  if(!userBgmEnabled) stopAllBgm();
   else ensureBgmPlaying();
   setBgmButtonText();
 }
@@ -382,18 +371,11 @@ function switchBgmMode(toLast){
   ensureBgmPlaying();
 }
 
-/* クリア後に時計音だけ残る対策 */
-function stopHypeBgmOnClear(){
-  if(!lastBgm.paused) lastBgm.pause();
-  lastMode=false;
-  ensureBgmPlaying();
-}
-
+/* ===== util ===== */
 document.addEventListener("contextmenu", (e)=>e.preventDefault());
 document.getElementById("restart").onclick=init;
 document.getElementById("restartTop").onclick=init;
 
-/* ===== util ===== */
 function inBounds(r,c){ return r>=0 && r<ROWS && c>=0 && c<COLS; }
 function neighbors(r,c){
   const res=[];
@@ -427,9 +409,7 @@ function remainingSafeCells(){
   return cnt;
 }
 function key(r,c){ return r+","+c; }
-function isAlienCell(r,c){
-  return alienPos && alienPos[0]===r && alienPos[1]===c;
-}
+function isAlienCell(r,c){ return alienPos && alienPos[0]===r && alienPos[1]===c; }
 
 /* ===== board ===== */
 function placeEnemiesWithSafeZone(excludeR, excludeC){
@@ -449,8 +429,6 @@ function placeEnemiesWithSafeZone(excludeR, excludeC){
     placed++;
   }
 
-  alienPos=null;
-  alienFound=false;
   while(true){
     const r=Math.floor(Math.random()*ROWS);
     const c=Math.floor(Math.random()*COLS);
@@ -464,9 +442,6 @@ function placeEnemiesWithSafeZone(excludeR, excludeC){
 }
 
 /* ===== render ===== */
-function cellEl(r,c){
-  return document.querySelector(`td[data-r="${r}"][data-c="${c}"]`);
-}
 function render(){
   const table=document.createElement("table");
   for(let r=0;r<ROWS;r++){
@@ -509,6 +484,9 @@ function render(){
   game.appendChild(table);
 }
 
+function cellEl(r,c){
+  return document.querySelector(`td[data-r="${r}"][data-c="${c}"]`);
+}
 function updateCellView(r,c){
   const td=cellEl(r,c);
   if(!td) return;
@@ -592,10 +570,9 @@ function openCell(r,c){
 
   if(isAlienCell(r,c)){
     opened[r][c]=true;
-    alienFound=true;
     updateCellView(r,c);
     play(alienSound);
-    statusEl.textContent="宇宙人だ！！！";
+    statusEl.textContent="火星人だ！！！";
     checkStagesAndClear();
     return;
   }
@@ -604,7 +581,8 @@ function openCell(r,c){
     gameOver=true;
     explorer.src=IMG_DEATH;
     explorer.classList.add("captured");
-    statusEl.textContent="撃沈…！";
+    explorer.classList.remove("perfect");
+    statusEl.textContent="任務失敗...!!";
     play(seDeath);
 
     for(let rr=0; rr<ROWS; rr++){
@@ -614,7 +592,6 @@ function openCell(r,c){
     }
     openExtraRing(r,c,EXTRA_RING_OPEN);
     refreshAll();
-
     ensureBgmPlaying();
     return;
   }
@@ -630,9 +607,7 @@ function toggleFlag(r,c){
   flags[r][c]=!flags[r][c];
   usedFlag = usedFlag || flags[r][c];
 
-  /* ★ここが要望：旗を立てた/外した時に効果音 */
   play(seFlag);
-
   updateCellView(r,c);
   checkStagesAndClear();
 }
@@ -677,20 +652,32 @@ function checkStagesAndClear(){
 
   if(rem===0 && !gameOver){
     gameOver=true;
-    stopHypeBgmOnClear();
-    setStage(0);
 
+    // クリアでBGM停止
+    stopAllBgm();
+
+    setStage(0);
     statusEl.classList.add("clear");
     explorer.classList.remove("captured","perfect");
 
-    if(!usedFlag){
+    const isPerfect = !usedFlag;
+
+    if(isPerfect){
       statusEl.textContent="PERFECT！！";
       explorer.src=IMG_PERFECT;
+
+      // 金枠
       explorer.classList.add("perfect");
-      play(sePerfect);
+
+      // ★要望：PERFECT時は clear2 を流さない
+      // clear1 → perfectClear
+      play(clear1);
+      setTimeout(()=>play(perfectClear), 650);
+
     }else{
       statusEl.textContent="CLEAR！！";
       explorer.src=IMG_CLEAR;
+
       play(clear1);
       setTimeout(()=>play(clear2),220);
     }
@@ -705,9 +692,7 @@ function init(){
   usedFlag=false;
   started=false;
   stageShown=0;
-
   alienPos=null;
-  alienFound=false;
 
   explorer.src=IMG_NORMAL;
   explorer.classList.remove("captured","perfect");
@@ -728,4 +713,3 @@ init();
 </script>
 </body>
 </html>
-```
