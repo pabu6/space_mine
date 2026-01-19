@@ -30,43 +30,18 @@ body{
   :root{--cell-size:48px;}
 }
 
-/* ====== スマホだけ調整（PCは触らない） ====== */
 @media(max-width:767px){
-  :root{--cell-size:min(8.2vw,34px);}
-
-  html,body{ overflow:hidden; }
-
+  :root{--cell-size:min(9vw,38px);}
   #container{
     flex-direction:column;
     align-items:center;
     padding-top:56px;
-    gap:8px;
+    gap:10px;
     box-sizing:border-box;
-    height:100vh;
   }
-
-  #side{ order:1; width:92vw; padding:8px; }
-
-  /* 画像が大きすぎて盤面が入らない対策 */
-  #explorer{
-    width:auto;
-    max-width:78vw;
-    height:18vh;
-    max-height:160px;
-    object-fit:contain;
-    display:block;
-    margin:0 auto;
-  }
-
-  #status{ margin-top:6px; font-size:16px; }
-
-  #game{
-    order:2;
-    width:92vw;
-    padding:6px;
-    max-height:calc(100vh - 56px - 18vh - 90px);
-    overflow:hidden;
-  }
+  #side{ order:1; width:92vw; padding:10px; }
+  #game{ order:2; width:92vw; padding:8px; }
+  #explorer{ width:58vw; max-width:300px; }
 }
 
 /* ======================
@@ -242,7 +217,7 @@ button{
   <button id="bgmToggleTop">BGM OFF</button>
 </div>
 
-<div id="hype"><div class="box" id="hypeText"></div></div>
+<div id="hype"><div class="box">ラスト1マス！！！</div></div>
 
 <div id="container">
   <div id="game"></div>
@@ -270,41 +245,49 @@ button{
 <audio id="lastBgm" src="last.mp3" loop></audio>
 
 <script>
+/* =========================
+   画像ファイル名（この通りに保存してください）
+   - 通常: explorer.jpeg
+   - 煽り1: hype1.jpeg  (残り10以下)
+   - 煽り2: hype2.jpeg  (残り3以下)
+   - 煽り3: hype3.jpeg  (残り1)
+   - クリア: clear.jpeg
+   - パーフェクト: perfect.jpeg
+========================= */
+
 const ROWS=9, COLS=9, ENEMIES=10;
 
+/* 表示画像（HTMLと同じフォルダに置く想定） */
 const IMG_NORMAL   = "explorer.jpeg";
 const IMG_HYPE1    = "hype1.jpeg";
 const IMG_HYPE2    = "hype2.jpeg";
 const IMG_HYPE3    = "hype3.jpeg";
 const IMG_CLEAR    = "clear.jpeg";
 const IMG_PERFECT  = "perfect.jpeg";
-const IMG_DEATH    = "explorer.jpeg";
+const IMG_DEATH    = "explorer.jpeg"; // 死亡時も通常画像のまま（別にするならここを変更）
 
+const ZERO_LIMIT_TRIES = 1500;
+const MAX_ZERO_CELLS = 8;
 const EXTRA_RING_OPEN = 3;
-
-/*
-  ★宇宙人が「クリックしてないのに出てくる」原因は、
-  0の連鎖（floodOpen）で宇宙人マスまで自動で開いてしまうこと。
-  → 対策：floodOpenの探索で「宇宙人マスはキューに入れない（自動開放しない）」。
-  これで必ず「そのマスを直接クリックした時だけ」宇宙人が出ます。
-*/
 
 let board=[], opened=[], flags=[];
 let gameOver=false;
 let usedFlag=false;
 let started=false;
 
-let lastMode=false;
-let stageShown=0;
+let lastMode=false;   // BGM切替用（残り<=10）
+let stageShown=0;     // 0/1/2/3
 
-let alienPos=null;     // [r,c]
+let alienPos=null;
 let alienFound=false;
+
+let halfShown=false;
+let lastTenShown=false;
 
 const game=document.getElementById("game");
 const explorer=document.getElementById("explorer");
 const statusEl=document.getElementById("status");
 const hype=document.getElementById("hype");
-const hypeText=document.getElementById("hypeText");
 
 const bgm=document.getElementById("bgm");
 const lastBgm=document.getElementById("lastBgm");
@@ -336,25 +319,18 @@ function startBgmIfPossible(){
   const target = lastMode ? lastBgm : bgm;
   target.play().then(()=>setBgmButtonText(true)).catch(()=>setBgmButtonText(false));
 }
-function switchBgmMode(toLast){
-  if(lastMode === toLast) return;
-  lastMode = toLast;
-  if(isAnyBgmPlaying()){
-    stopAllBgm();
-    startBgmIfPossible();
-  }
-}
 function toggleBGM(){
   if(isAnyBgmPlaying()){
     stopAllBgm(); setBgmButtonText(false);
   }else{
-    startBgmIfPossible();
+    const target = lastMode ? lastBgm : bgm;
+    target.play().then(()=>setBgmButtonText(true)).catch(()=>setBgmButtonText(false));
   }
 }
 bgmToggle.onclick=toggleBGM;
 bgmToggleTop.onclick=toggleBGM;
 
-/* 自動再生制限対策 */
+/* スマホ自動再生制限対策 */
 document.addEventListener("pointerdown", ()=>{
   if(!isAnyBgmPlaying()) startBgmIfPossible();
 },{once:true});
@@ -366,6 +342,13 @@ document.getElementById("restart").onclick=init;
 document.getElementById("restartTop").onclick=init;
 
 /* ===== util ===== */
+function shuffle(arr){
+  for(let i=arr.length-1;i>0;i--){
+    const j=Math.floor(Math.random()*(i+1));
+    [arr[i],arr[j]]=[arr[j],arr[i]];
+  }
+  return arr;
+}
 function inBounds(r,c){ return r>=0 && r<ROWS && c>=0 && c<COLS; }
 function neighbors(r,c){
   const res=[];
@@ -389,18 +372,10 @@ function computeNumbers(){
     }
   }
 }
-function remainingSafeCells(){
-  let cnt=0;
-  for(let r=0;r<ROWS;r++){
-    for(let c=0;c<COLS;c++){
-      if(board[r][c]!==-1 && !opened[r][c]) cnt++;
-    }
-  }
-  return cnt;
-}
-function key(r,c){ return r+","+c; }
-function isAlienCell(r,c){
-  return alienPos && alienPos[0]===r && alienPos[1]===c;
+function countZeroCells(){
+  let z=0;
+  for(let r=0;r<ROWS;r++) for(let c=0;c<COLS;c++) if(board[r][c]===0) z++;
+  return z;
 }
 
 /* ===== board ===== */
@@ -408,315 +383,422 @@ function placeEnemiesWithSafeZone(excludeR, excludeC){
   board = Array.from({length:ROWS},()=>Array(COLS).fill(0));
 
   const safe=new Set();
-  safe.add(key(excludeR,excludeC));
-  for(const [nr,nc] of neighbors(excludeR, excludeC)) safe.add(key(nr,nc));
+  safe.add(excludeR+","+excludeC);
+  for(const [nr,nc] of neighbors(excludeR, excludeC)) safe.add(nr+","+nc);
 
   let placed=0;
   while(placed<ENEMIES){
     const r=Math.floor(Math.random()*ROWS);
     const c=Math.floor(Math.random()*COLS);
-    if(safe.has(key(r,c))) continue;
     if(board[r][c]===-1) continue;
+    if(safe.has(r+","+c)) continue;
     board[r][c]=-1;
     placed++;
   }
-
-  // 宇宙人（安全マス）を1体配置：地雷ではない＆安全地帯にも置かない
-  alienPos=null;
-  alienFound=false;
-  while(true){
-    const r=Math.floor(Math.random()*ROWS);
-    const c=Math.floor(Math.random()*COLS);
-    if(safe.has(key(r,c))) continue;
-    if(board[r][c]===-1) continue;
-    alienPos=[r,c];
-    break;
-  }
-
   computeNumbers();
 }
-
-/* ===== render ===== */
-function cellEl(r,c){
-  return document.querySelector(`td[data-r="${r}"][data-c="${c}"]`);
+function generateBoard(excludeR, excludeC){
+  let best=null, bestZero=999;
+  for(let t=0; t<ZERO_LIMIT_TRIES; t++){
+    placeEnemiesWithSafeZone(excludeR, excludeC);
+    const z=countZeroCells();
+    if(z<bestZero){
+      bestZero=z;
+      best=board.map(row=>row.slice());
+      if(z<=MAX_ZERO_CELLS) break;
+    }
+  }
+  board = best || board;
 }
 
-function render(){
-  const table=document.createElement("table");
+/* alien every game */
+function placeAlien(excludeR, excludeC){
+  const avoid=new Set();
+  avoid.add(excludeR+","+excludeC);
+  for(const [nr,nc] of neighbors(excludeR, excludeC)) avoid.add(nr+","+nc);
+
+  const candidates=[];
   for(let r=0;r<ROWS;r++){
-    const tr=document.createElement("tr");
     for(let c=0;c<COLS;c++){
-      const td=document.createElement("td");
-      td.dataset.r=r; td.dataset.c=c;
-
-      td.addEventListener("click", (e)=>{
-        e.preventDefault();
-        if(gameOver) return;
-        openCell(r,c);
-      });
-
-      td.addEventListener("contextmenu", (e)=>{
-        e.preventDefault();
-        if(gameOver) return;
-        toggleFlag(r,c);
-      });
-
-      // スマホ長押し旗
-      let pressTimer=null;
-      td.addEventListener("pointerdown", (e)=>{
-        if(e.pointerType === "mouse") return;
-        if(gameOver) return;
-        pressTimer=setTimeout(()=>{
-          toggleFlag(r,c);
-          pressTimer=null;
-        }, 380);
-      });
-      td.addEventListener("pointerup", ()=>{ if(pressTimer){ clearTimeout(pressTimer); pressTimer=null; } });
-      td.addEventListener("pointerleave", ()=>{ if(pressTimer){ clearTimeout(pressTimer); pressTimer=null; } });
-      td.addEventListener("pointercancel", ()=>{ if(pressTimer){ clearTimeout(pressTimer); pressTimer=null; } });
-
-      tr.appendChild(td);
-    }
-    table.appendChild(tr);
-  }
-  game.innerHTML="";
-  game.appendChild(table);
-}
-
-function updateCellView(r,c){
-  const td=cellEl(r,c);
-  if(!td) return;
-
-  td.className="";
-  td.textContent="";
-
-  if(flags[r][c] && !opened[r][c]){
-    td.classList.add("flag");
-    td.textContent="🚩";
-    return;
-  }
-
-  if(!opened[r][c]){
-    return;
-  }
-
-  // 宇宙人は「開かれた後」だけ表示される（openedがtrueの時だけここに来る）
-  if(isAlienCell(r,c)){
-    td.classList.add("open","alien");
-    td.textContent="";
-    return;
-  }
-
-  td.classList.add("open");
-  const v=board[r][c];
-
-  if(v===-1){
-    td.classList.add("enemy");
-    td.textContent="";
-    return;
-  }
-  if(v===0){
-    td.textContent="";
-    return;
-  }
-  td.textContent=String(v);
-  td.classList.add("num"+v);
-}
-function refreshAll(){
-  for(let r=0;r<ROWS;r++) for(let c=0;c<COLS;c++) updateCellView(r,c);
-}
-
-/* ===== game logic ===== */
-function floodOpen(sr,sc){
-  const q=[[sr,sc]];
-  const seen=new Set([key(sr,sc)]);
-
-  while(q.length){
-    const [r,c]=q.shift();
-    opened[r][c]=true;
-    flags[r][c]=false;
-    updateCellView(r,c);
-
-    // 宇宙人マスはここに来るのは「クリックで開かれた時だけ」だが
-    // 念のため拡散は止める
-    if(isAlienCell(r,c)) continue;
-
-    if(board[r][c]!==0) continue;
-
-    for(const [nr,nc] of neighbors(r,c)){
-      const k=key(nr,nc);
-      if(seen.has(k)) continue;
-      if(opened[nr][nc]) continue;
-      if(flags[nr][nc]) continue;
-
-      // ★重要：宇宙人マスは自動連鎖で開けない（クリック必須）
-      if(isAlienCell(nr,nc)) continue;
-
-      seen.add(k);
-      q.push([nr,nc]);
+      if(board[r][c]===-1) continue;
+      if(avoid.has(r+","+c)) continue;
+      candidates.push({r,c});
     }
   }
+  if(candidates.length===0){
+    for(let r=0;r<ROWS;r++) for(let c=0;c<COLS;c++) if(board[r][c]!==-1) candidates.push({r,c});
+  }
+  alienPos = candidates[Math.floor(Math.random()*candidates.length)] || null;
+  alienFound=false;
 }
 
-function openExtraRing(r,c,dist){
-  for(let dr=-dist; dr<=dist; dr++){
-    for(let dc=-dist; dc<=dist; dc++){
-      const nr=r+dr, nc=c+dc;
-      if(!inBounds(nr,nc)) continue;
-      if(opened[nr][nc]) continue;
-      opened[nr][nc]=true;
-      updateCellView(nr,nc);
-    }
-  }
+/* ===== state ===== */
+function setExplorerImageByStage(stage){
+  // gameOver中は別処理（死亡/クリア）なのでここは通常プレイ時専用
+  if(stage===0) explorer.src = IMG_NORMAL;
+  if(stage===1) explorer.src = IMG_HYPE1;
+  if(stage===2) explorer.src = IMG_HYPE2;
+  if(stage===3) explorer.src = IMG_HYPE3;
 }
 
-function openCell(r,c){
-  if(gameOver) return;
-  if(flags[r][c]) return;
+function buildEmptyState(){
+  board = Array.from({length:ROWS},()=>Array(COLS).fill(0));
+  opened = Array.from({length:ROWS},()=>Array(COLS).fill(false));
+  flags  = Array.from({length:ROWS},()=>Array(COLS).fill(false));
 
-  if(!started){
-    started=true;
-    placeEnemiesWithSafeZone(r,c);
-  }
-
-  if(opened[r][c]) return;
-
-  play(seOpen);
-
-  // 宇宙人：そのマスを「直接クリック」した時だけ出る
-  if(isAlienCell(r,c)){
-    opened[r][c]=true;
-    alienFound=true;
-    updateCellView(r,c);
-    play(alienSound);
-    statusEl.textContent="宇宙人だ！！！";
-    checkStagesAndClear();
-    return;
-  }
-
-  if(board[r][c]===-1){
-    gameOver=true;
-    explorer.src = IMG_DEATH;
-    explorer.classList.add("captured");
-    statusEl.textContent="撃沈…！";
-    play(seDeath);
-
-    for(let rr=0; rr<ROWS; rr++){
-      for(let cc=0; cc<COLS; cc++){
-        if(board[rr][cc]===-1) opened[rr][cc]=true;
-      }
-    }
-    openExtraRing(r,c,EXTRA_RING_OPEN);
-    refreshAll();
-    return;
-  }
-
-  floodOpen(r,c);
-  checkStagesAndClear();
-}
-
-function toggleFlag(r,c){
-  if(gameOver) return;
-  if(opened[r][c]) return;
-
-  flags[r][c]=!flags[r][c];
-  usedFlag = usedFlag || flags[r][c];
-
-  play(seFlag);
-  updateCellView(r,c);
-  checkStagesAndClear();
-}
-
-function showHypeOnce(text){
-  hypeText.textContent=text;
-  hype.classList.add("show");
-  setTimeout(()=>hype.classList.remove("show"), 900);
-}
-
-function setStage(stage){
-  game.classList.remove("stage1","stage2","stage3");
-  if(stage===1) game.classList.add("stage1");
-  if(stage===2) game.classList.add("stage2");
-  if(stage===3) game.classList.add("stage3");
-}
-
-function checkStagesAndClear(){
-  const rem = remainingSafeCells();
-
-  if(rem<=10 && stageShown<1){
-    stageShown=1;
-    setStage(1);
-    explorer.src = IMG_HYPE1;
-    statusEl.textContent="早く宇宙船に戻らないと...!";
-    switchBgmMode(true);
-  }
-
-  if(rem<=3 && stageShown<2){
-    stageShown=2;
-    setStage(2);
-    explorer.src = IMG_HYPE2;
-    statusEl.textContent="もう少しだ…！";
-  }
-
-  // 最後の1マス
-  if(rem<=1 && stageShown<3){
-    stageShown=3;
-    setStage(3);
-    explorer.src = IMG_HYPE3;
-    statusEl.textContent="早く脱出しないとおぉっっっ！！！";
-    showHypeOnce("早く脱出しないとおぉっっっ！！！");
-  }
-
-  if(rem===0 && !gameOver){
-    gameOver=true;
-    setStage(0);
-    stopAllBgm();
-    setBgmButtonText(false);
-
-    statusEl.classList.add("clear");
-    explorer.classList.remove("captured");
-    explorer.classList.remove("perfect");
-
-    if(!usedFlag){
-      statusEl.textContent="PERFECT！！";
-      explorer.src = IMG_PERFECT;
-      explorer.classList.add("perfect");
-      play(sePerfect);
-    }else{
-      statusEl.textContent="CLEAR！！";
-      explorer.src = IMG_CLEAR;
-      play(clear1);
-      setTimeout(()=>play(clear2), 220);
-    }
-  }
-}
-
-function init(){
   gameOver=false;
   usedFlag=false;
   started=false;
+
   lastMode=false;
   stageShown=0;
 
   alienPos=null;
   alienFound=false;
 
+  halfShown=false;
+  lastTenShown=false;
+
   explorer.src = IMG_NORMAL;
   explorer.classList.remove("captured","perfect");
+
   statusEl.classList.remove("clear");
   statusEl.textContent="探索開始！";
+
+  game.classList.remove("stage1","stage2","stage3");
+  hype.classList.remove("show");
+
+  stopAllBgm();
+  startBgmIfPossible();
+}
+
+function init(){
+  buildEmptyState();
+  render();
+}
+
+/* ===== render ===== */
+function render(){
+  const table=document.createElement("table");
+
+  for(let r=0;r<ROWS;r++){
+    const tr=document.createElement("tr");
+    for(let c=0;c<COLS;c++){
+      const td=document.createElement("td");
+      const isOpen=opened[r][c];
+      const isFlag=flags[r][c];
+
+      if(isOpen) td.classList.add("open");
+      if(isFlag) td.classList.add("flag");
+
+      if(isOpen && alienPos && alienPos.r===r && alienPos.c===c && alienFound){
+        td.classList.add("alien");
+        td.textContent="";
+      }else if(isOpen){
+        const v=board[r][c];
+        if(v===-1){
+          td.classList.add("enemy");
+          td.textContent="";
+        }else if(v===0){
+          td.textContent="";
+        }else{
+          td.textContent=String(v);
+          td.classList.add("num"+v);
+        }
+      }else{
+        td.textContent = isFlag ? "🚩" : "";
+      }
+
+      td.addEventListener("click", ()=> onOpen(r,c));
+      td.addEventListener("contextmenu", (e)=>{ e.preventDefault(); onToggleFlag(r,c); });
+      attachLongPress(td, ()=> onToggleFlag(r,c));
+
+      tr.appendChild(td);
+    }
+    table.appendChild(tr);
+  }
+
+  game.innerHTML="";
+  game.appendChild(table);
+
+  updateProgressMessages();
+  updateEndgameEffects(); // ここで段階に応じて画像も切り替える
+}
+
+/* ===== long press ===== */
+function attachLongPress(el, fn){
+  let timer=null;
+  let moved=false;
+
+  const start=()=>{
+    if(gameOver) return;
+    moved=false;
+    timer=setTimeout(()=>{ timer=null; fn(); }, 450);
+  };
+  const cancel=()=>{ if(timer){ clearTimeout(timer); timer=null; } };
+
+  el.addEventListener("touchstart", start, {passive:true});
+  el.addEventListener("touchmove", ()=>{ moved=true; cancel(); }, {passive:true});
+  el.addEventListener("touchend", ()=>{ if(!moved) cancel(); }, {passive:true});
+  el.addEventListener("touchcancel", cancel, {passive:true});
+}
+
+/* ===== gameplay ===== */
+function ensureStarted(firstR, firstC){
+  if(started) return;
+  started=true;
+  generateBoard(firstR, firstC);
+  placeAlien(firstR, firstC);
+}
+
+function openZeroAreaFullWithRing(sr, sc){
+  const zeroSet=new Set();
+  const ringSet=new Set();
+  const q=[[sr,sc]];
+  zeroSet.add(sr+","+sc);
+
+  while(q.length){
+    const [r,c]=q.shift();
+    for(const [nr,nc] of neighbors(r,c)){
+      if(board[nr][nc]===0){
+        const key=nr+","+nc;
+        if(!zeroSet.has(key)){
+          zeroSet.add(key);
+          q.push([nr,nc]);
+        }
+      }else if(board[nr][nc]>0){
+        ringSet.add(nr+","+nc);
+      }
+    }
+  }
+
+  for(const key of zeroSet){
+    const [r,c]=key.split(",").map(Number);
+    if(!flags[r][c]) opened[r][c]=true;
+  }
+  for(const key of ringSet){
+    const [r,c]=key.split(",").map(Number);
+    if(!flags[r][c]) opened[r][c]=true;
+  }
+
+  // 追加で少しだけ開く（リング外側の数字のみ）
+  const extraCandidates=new Set();
+  for(const key of ringSet){
+    const [r,c]=key.split(",").map(Number);
+    for(const [nr,nc] of neighbors(r,c)){
+      const k=nr+","+nc;
+      if(!inBounds(nr,nc)) continue;
+      if(zeroSet.has(k) || ringSet.has(k)) continue;
+      if(opened[nr][nc] || flags[nr][nc]) continue;
+      if(board[nr][nc] > 0) extraCandidates.add(k);
+    }
+  }
+  const list=[...extraCandidates].map(s=>s.split(",").map(Number));
+  shuffle(list);
+  for(let i=0;i<Math.min(EXTRA_RING_OPEN, list.length); i++){
+    const [r,c]=list[i];
+    opened[r][c]=true;
+  }
+}
+
+function onOpen(r,c){
+  if(gameOver) return;
+  if(flags[r][c]) return;
+
+  ensureStarted(r,c);
+  if(opened[r][c]) return;
+
+  const isAlienCell = alienPos && alienPos.r===r && alienPos.c===c;
+
+  if(board[r][c]===-1){
+    opened[r][c]=true;
+    revealAllEnemies();
+    gameOver=true;
+
+    explorer.src = IMG_DEATH;
+    explorer.classList.add("captured");
+    statusEl.textContent="ドカーンッ！ 任務失敗！！";
+    play(seDeath);
+
+    stopAllBgm();
+    setBgmButtonText(false);
+
+    render();
+    return;
+  }
+
+  opened[r][c]=true;
+
+  if(isAlienCell && !alienFound){
+    alienFound=true;
+    play(alienSound);
+    statusEl.textContent="あっ！！火星人だ！！";
+  }
+
+  if(board[r][c]===0){
+    openZeroAreaFullWithRing(r,c);
+
+    // 宇宙人は自分で開けたい：自動展開で勝手に開いたら閉じ戻す
+    if(alienPos && !alienFound && opened[alienPos.r][alienPos.c]){
+      opened[alienPos.r][alienPos.c]=false;
+    }
+  }
+
+  play(seOpen);
+  render();
+  checkClear();
+}
+
+function onToggleFlag(r,c){
+  if(gameOver) return;
+  if(opened[r][c]) return;
+
+  usedFlag=true;
+  flags[r][c]=!flags[r][c];
+  play(seFlag);
+  render();
+  checkClear();
+}
+
+function revealAllEnemies(){
+  for(let r=0;r<ROWS;r++){
+    for(let c=0;c<COLS;c++){
+      if(board[r][c]===-1) opened[r][c]=true;
+    }
+  }
+}
+
+/* ===== progress messages ===== */
+function remainingSafeCells(){
+  let remain=0;
+  for(let r=0;r<ROWS;r++){
+    for(let c=0;c<COLS;c++){
+      if(board[r][c]!==-1 && !opened[r][c]) remain++;
+    }
+  }
+  return remain;
+}
+function countOpenedSafeCells(){
+  let n=0;
+  for(let r=0;r<ROWS;r++){
+    for(let c=0;c<COLS;c++){
+      if(board[r][c]!==-1 && opened[r][c]) n++;
+    }
+  }
+  return n;
+}
+function totalSafeCells(){ return ROWS*COLS - ENEMIES; }
+
+function updateProgressMessages(){
+  if(!started || gameOver) return;
+
+  const openedSafe=countOpenedSafeCells();
+  const totalSafe=totalSafeCells();
+
+  if(!halfShown && openedSafe >= Math.ceil(totalSafe/2)){
+    halfShown=true;
+    statusEl.textContent="やっと半分だ！";
+  }
+
+  const remain=remainingSafeCells();
+  if(!lastTenShown && remain>0 && remain<10){
+    lastTenShown=true;
+    statusEl.textContent="あと少し！！";
+  }
+}
+
+/* ===== endgame effects (3 stages) ===== */
+function showLastOneHypeOnce(){
+  hype.classList.add("show");
+  setTimeout(()=>hype.classList.remove("show"), 900);
+}
+
+function updateEndgameEffects(){
+  if(!started || gameOver) return;
+
+  const remain=remainingSafeCells();
+
+  // ステージ判定
+  let stage=0;
+  if(remain>0 && remain<=10) stage=1;
+  if(remain>0 && remain<=3)  stage=2;
+  if(remain===1)             stage=3;
+
+  // 盤面クラス更新
+  game.classList.remove("stage1","stage2","stage3");
+  if(stage===1) game.classList.add("stage1");
+  if(stage===2) game.classList.add("stage2");
+  if(stage===3) game.classList.add("stage3");
+
+  // 画像切り替え（煽り段階）
+  setExplorerImageByStage(stage);
+
+  // BGM切替（残り<=10）
+  const shouldLast = stage>=1;
+  if(shouldLast && !lastMode){
+    lastMode=true;
+    if(isAnyBgmPlaying()){
+      bgm.pause();
+      lastBgm.currentTime=0;
+      lastBgm.play().catch(()=>{});
+    }
+  }
+  if(!shouldLast && lastMode){
+    lastMode=false;
+    if(isAnyBgmPlaying()){
+      lastBgm.pause();
+      bgm.currentTime=0;
+      bgm.play().catch(()=>{});
+    }
+  }
+
+  // 段階突入時のメッセージ
+  if(stage > stageShown){
+    stageShown = stage;
+    if(stage===2){
+      statusEl.textContent="急がないと惑星が爆発する！";
+    }else if(stage===3){
+      // 3段階目突入
+      showLastOneHypeOnce();
+      statusEl.textContent="早く脱出しないとぉぉぉっっ！！！";
+    }
+  }
+
+  // 3段階目は「もう1つの文言」も出したい要望があったため、交互表示
+  if(stage===3){
+    const t = Date.now();
+    statusEl.textContent = (Math.floor(t/1200)%2===0)
+      ? "早く宇宙船に戻らないと！！"
+      : "早く脱出しないとぉぉぉっっ！！！";
+  }
+}
+
+/* ===== clear ===== */
+function checkClear(){
+  if(gameOver) return;
+  if(!started) return;
+
+  for(let r=0;r<ROWS;r++){
+    for(let c=0;c<COLS;c++){
+      if(board[r][c]!==-1 && !opened[r][c]) return;
+    }
+  }
+
+  gameOver=true;
+  statusEl.textContent="任務成功！！";
+  statusEl.classList.add("clear");
 
   stopAllBgm();
   setBgmButtonText(false);
 
-  board = Array.from({length:ROWS},()=>Array(COLS).fill(0));
-  opened = Array.from({length:ROWS},()=>Array(COLS).fill(false));
-  flags  = Array.from({length:ROWS},()=>Array(COLS).fill(false));
-
-  game.classList.remove("stage1","stage2","stage3");
-
-  render();
-  refreshAll();
+  if(!usedFlag){
+    explorer.src = IMG_PERFECT;
+    explorer.classList.add("perfect");
+    play(sePerfect);
+  }else{
+    explorer.src = IMG_CLEAR;
+    play(Math.random()<0.5 ? clear1 : clear2);
+  }
 }
 
 init();
