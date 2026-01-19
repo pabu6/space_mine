@@ -6,27 +6,63 @@
 <title>宇宙探査マインスイーパー</title>
 <style>
 :root{--cell-size:36px;}
-body{margin:0;font-family:sans-serif;background:url("space.jpg") center/cover no-repeat fixed;color:#fff;-webkit-touch-callout:none;-webkit-user-select:none;-khtml-user-select:none;-moz-user-select:none;-ms-user-select:none;user-select:none;}
+body{
+  margin:0;
+  font-family:sans-serif;
+  background:url("space.jpg") center/cover no-repeat fixed;
+  color:#fff;
+  -webkit-touch-callout:none; -webkit-user-select:none;
+  -khtml-user-select:none; -moz-user-select:none;
+  -ms-user-select:none; user-select:none;
+}
+
 #container{display:flex;min-height:100vh;}
-@media(min-width:768px){#container{justify-content:center;align-items:center;gap:32px;} :root{--cell-size:48px;}}
+@media(min-width:768px){
+  #container{justify-content:center;align-items:center;gap:32px;}
+  :root{--cell-size:48px;}
+}
+
 @media(max-width:767px){
-  #container{flex-direction:column;align-items:center;}
   :root{--cell-size:min(9vw,40px);}
-  #side{order:-1;width:100%;display:flex;justify-content:space-around;margin-bottom:8px;}
-  #explorer{width:40vw;}
+  #container{flex-direction:column;align-items:center;}
+  #side{
+    order:-1; width:90%; display:flex; flex-direction:column; align-items:center;
+    margin-bottom:8px;
+  }
+  #explorer{width:40vw; margin-bottom:8px;}
+  #buttonsWrapper{display:flex; gap:8px;} /* 横並びにする */
+  #restart,#bgmToggle{width:auto; font-size:14px; padding:6px 12px;}
   #game{width:90vw; max-width:90vw;}
 }
-#game{padding:10px;background:rgba(0,0,20,.6);border-radius:6px;position:relative;transition:filter .5s;}
-#game.last-dark{filter:brightness(0.5) contrast(1.2);animation:heartbeat 1s infinite;}
+
+/* --- ゲーム盤面 --- */
+#game{
+  padding:10px;
+  background:rgba(0,0,20,.6);
+  border-radius:6px;
+  position:relative;
+  transition:filter .5s;
+}
+#game.last-dark{
+  filter:brightness(0.5) contrast(1.2);
+  animation:heartbeat 1s infinite;
+}
 @keyframes heartbeat{0%,100%{filter:brightness(0.5);}50%{filter:brightness(0.7);}}
+
 table{border-collapse:collapse;}
-td{width:var(--cell-size);height:var(--cell-size);border:1px solid #111144;background:#1a1a3d;text-align:center;font-weight:bold;cursor:pointer;font-size:calc(var(--cell-size)*0.5);color:#fff;}
-td:hover{background:#2a2a5a;} td.open{background:#33334d;cursor:default;}
+td{
+  width:var(--cell-size); height:var(--cell-size);
+  border:1px solid #111144; background:#1a1a3d;
+  text-align:center; font-weight:bold;
+  cursor:pointer; font-size:calc(var(--cell-size)*0.5); color:#fff;
+}
+td:hover{background:#2a2a5a;} td.open{background:#33334d; cursor:default;}
 .num1{color:#66ccff;} .num2{color:#33ff77;} .num3{color:#ff6666;} .num4{color:#cc66ff;}
 .num5{color:#ffcc66;} .num6{color:#00cccc;} .num7{color:#aaaaaa;} .num8{color:#ffffff;}
 td.flag{background:#111144;color:#0f0;} td.enemy{background:black url("asteroid.jpeg") center/cover no-repeat;animation:pop .4s ease;}
 td.alien{background:url("alien.jpeg") center/cover no-repeat;}
 @keyframes pop{0%{transform:scale(1);}50%{transform:scale(1.2);}100%{transform:scale(1);}}
+
 #side{background:rgba(5,5,20,.7);padding:12px;text-align:center;border-radius:8px;}
 @media(min-width:768px){#side{width:300px;}}
 #explorer{width:min(320px,90vw);transition:.4s;cursor:default;}
@@ -34,7 +70,10 @@ td.alien{background:url("alien.jpeg") center/cover no-repeat;}
 #explorer.captured{filter:grayscale(40%) brightness(.8);}
 #status{margin-top:8px;font-size:18px;font-weight:bold;}
 #status.clear{color:gold;text-shadow:0 0 8px gold;}
-button{margin-top:8px;padding:8px 16px;font-size:16px;background:#1a1a3d;border:none;color:white;cursor:pointer;}
+
+#buttonsWrapper{margin-top:8px;}
+button{margin-top:0;padding:8px 16px;font-size:16px;background:#1a1a3d;border:none;color:white;cursor:pointer;}
+
 #zoomOverlay{position:fixed;inset:0;background:rgba(0,0,0,.85);display:none;justify-content:center;align-items:center;z-index:9999;}
 #zoomOverlay img{max-width:90vw;max-height:90vh;border:8px solid gold;border-radius:16px;box-shadow:0 0 40px gold;}
 #goldFlash{position:absolute;inset:0;background:gold;opacity:0;animation:flash .8s ease;}
@@ -51,10 +90,13 @@ button{margin-top:8px;padding:8px 16px;font-size:16px;background:#1a1a3d;border:
   <div id="side">
     <img id="explorer" src="explorer.jpeg">
     <div id="status">探索開始！</div>
-    <button id="restart">RESTART</button>
-    <button id="bgmToggle">BGM OFF</button>
+    <div id="buttonsWrapper">
+      <button id="restart">RESTART</button>
+      <button id="bgmToggle">BGM OFF</button>
+    </div>
   </div>
 </div>
+
 <div id="zoomOverlay"><img id="zoomImage"></div>
 <div id="flashOverlay"></div>
 
@@ -101,7 +143,6 @@ document.body.addEventListener("touchstart",playBGM,{once:true});
 
 explorer.onclick=()=>{if(!explorer.classList.contains("perfect"))return; zoomImage.src=explorer.src; zoomOverlay.style.display="flex";};
 zoomOverlay.onclick=()=>zoomOverlay.style.display="none";
-
 document.getElementById("restart").onclick=init;
 
 function init(){
@@ -111,12 +152,10 @@ function init(){
   gameOver=false; usedFlag=false; lastMode=false; alienPlaced=false;
 
   stopAllBGM(); playBGM();
-
   game.classList.remove("last-dark");
   explorer.src="explorer.jpeg"; explorer.className="";
   status.textContent="探索開始！"; status.className="";
   flashOverlay.classList.remove("flashAnim");
-
   let old=document.getElementById("boardMessage"); if(old) old.remove();
 
   // 爆弾配置
@@ -138,24 +177,35 @@ function init(){
   }
 
   // 宇宙人1体配置
-  const emptyCells=[]; for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++){ if(board[r][c]===0) emptyCells.push([r,c]); }
+  const emptyCells=[];
+  for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++){ if(board[r][c]===0) emptyCells.push([r,c]); }
   if(emptyCells.length>0){ const [ar,ac]=emptyCells[Math.floor(Math.random()*emptyCells.length)]; board[ar][ac]='A'; alienPlaced=true; }
 
   draw();
 }
 
 function draw(){
-  game.innerHTML=""; const table=document.createElement("table");
-  for(let r=0;r<ROWS;r++){ const tr=document.createElement("tr");
-    for(let c=0;c<COLS;c++){ const td=document.createElement("td");
-      if(opened[r][c]){ td.classList.add("open"); if(board[r][c]==="E") td.classList.add("enemy");
-      else if(board[r][c]==="A") td.classList.add("alien");
-      else if(board[r][c]>0){ td.textContent=board[r][c]; td.classList.add("num"+board[r][c]); } }
-      else if(flags[r][c]){ td.classList.add("flag"); td.textContent="🚩"; }
+  game.innerHTML="";
+  const table=document.createElement("table");
+  for(let r=0;r<ROWS;r++){
+    const tr=document.createElement("tr");
+    for(let c=0;c<COLS;c++){
+      const td=document.createElement("td");
+      if(opened[r][c]){
+        td.classList.add("open");
+        if(board[r][c]==="E") td.classList.add("enemy");
+        else if(board[r][c]==="A") td.classList.add("alien");
+        else if(board[r][c]>0){ td.textContent=board[r][c]; td.classList.add("num"+board[r][c]); }
+      } else if(flags[r][c]){ td.classList.add("flag"); td.textContent="🚩"; }
 
       let pressTimer=null, longPress=false;
-      td.addEventListener("touchstart", e=>{ if(gameOver||opened[r][c]) return; longPress=false;
-        pressTimer=setTimeout(()=>{ flags[r][c]=!flags[r][c]; usedFlag=true; longPress=true; play(seFlag); draw(); checkLast2(); },500); });
+      td.addEventListener("touchstart", e=>{
+        if(gameOver||opened[r][c]) return;
+        longPress=false;
+        pressTimer=setTimeout(()=>{
+          flags[r][c]=!flags[r][c]; usedFlag=true; longPress=true; play(seFlag); draw(); checkLast2();
+        },500);
+      });
       td.addEventListener("touchend", ()=>clearTimeout(pressTimer));
       td.addEventListener("touchmove", ()=>clearTimeout(pressTimer));
       td.onclick=()=>{ if(longPress) return; if(!gameOver && !flags[r][c]){ openCell(r,c); draw(); } };
